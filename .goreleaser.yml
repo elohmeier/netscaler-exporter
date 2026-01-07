@@ -1,0 +1,31 @@
+version: 2
+
+builds:
+  - ldflags: -s -w -X main.version={{.Version}}
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+dockers:
+  - image_templates:
+      - ghcr.io/elohmeier/netscaler-exporter:{{.Version}}-amd64
+    use: buildx
+    goarch: amd64
+    build_flag_templates:
+      - --platform=linux/amd64
+  - image_templates:
+      - ghcr.io/elohmeier/netscaler-exporter:{{.Version}}-arm64
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - --platform=linux/arm64
+
+docker_manifests:
+  - name_template: ghcr.io/elohmeier/netscaler-exporter:{{.Version}}
+    image_templates:
+      - ghcr.io/elohmeier/netscaler-exporter:{{.Version}}-amd64
+      - ghcr.io/elohmeier/netscaler-exporter:{{.Version}}-arm64
+  - name_template: ghcr.io/elohmeier/netscaler-exporter:latest
+    image_templates:
+      - ghcr.io/elohmeier/netscaler-exporter:{{.Version}}-amd64
+      - ghcr.io/elohmeier/netscaler-exporter:{{.Version}}-arm64

@@ -1,459 +1,423 @@
 package collector
 
 import (
+	"context"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
-	"github.com/rokett/citrix-netscaler-exporter/netscaler"
+	"github.com/elohmeier/netscaler-exporter/config"
+	"github.com/elohmeier/netscaler-exporter/netscaler"
 
-	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Collect is initiated by the Prometheus handler and gathers the metrics
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	nsClient, err := netscaler.NewNitroClient(e.url, e.username, e.password, e.ignoreCert)
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-		return
-	}
-	defer nsClient.CloseIdleConnection()
+	var wg sync.WaitGroup
 
-	err = netscaler.Connect(nsClient)
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-		ch <- prometheus.NewInvalidMetric(prometheus.NewDesc("citrix_netscaler_exporter_error", "Error scraping target", nil, nil), err)
-		return
+	// Scrape all targets concurrently
+	for _, target := range e.targets {
+		wg.Add(1)
+		go func(t config.Target) {
+			defer wg.Done()
+			e.scrapeTarget(t, ch)
+		}(target)
 	}
 
-	nslicense, err := netscaler.GetNSLicense(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
+	wg.Wait()
+}
+
+// scrapeTarget scrapes a single NetScaler target
+func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	nsInstance := target.Name
+	nsClient := netscaler.NewNitroClient(target.URL, target.Username, target.Password, target.GetIgnoreCert())
+	defer nsClient.CloseIdleConnections()
+
+	var wg sync.WaitGroup
+	// Semaphore to limit concurrent requests to 5 to avoid overloading the NetScaler
+	sem := make(chan struct{}, 5)
+
+	// Helper to run a scrape function concurrently
+	run := func(name string, scrapeFn func()) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}: // Acquire token
+				defer func() { <-sem }() // Release token
+				scrapeFn()
+			case <-ctx.Done():
+				e.logger.Warn("context cancelled, skipping scrape", "target", target.Name, "name", name)
+			}
+		}()
 	}
 
-	ns, err := netscaler.GetNSStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	interfaces, err := netscaler.GetInterfaceStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	virtualServers, err := netscaler.GetVirtualServerStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	services, err := netscaler.GetServiceStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	gslbServices, err := netscaler.GetGSLBServiceStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	gslbVirtualServers, err := netscaler.GetGSLBVirtualServerStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	csVirtualServers, err := netscaler.GetCSVirtualServerStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	vpnVirtualServers, err := netscaler.GetVPNVirtualServerStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	aaa, err := netscaler.GetAAAStats(nsClient, "")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	fltModelID, _ := strconv.ParseFloat(nslicense.NSLicense.ModelID, 64)
-
-	fltTotRxMB, _ := strconv.ParseFloat(ns.NSStats.TotalReceivedMB, 64)
-	fltTotTxMB, _ := strconv.ParseFloat(ns.NSStats.TotalTransmitMB, 64)
-	fltHTTPRequests, _ := strconv.ParseFloat(ns.NSStats.HTTPRequests, 64)
-	fltHTTPResponses, _ := strconv.ParseFloat(ns.NSStats.HTTPResponses, 64)
-
-	fltTCPCurrentClientConnections, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentClientConnections, 64)
-	fltTCPCurrentClientConnectionsEstablished, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentClientConnectionsEstablished, 64)
-	fltTCPCurrentServerConnections, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentServerConnections, 64)
-	fltTCPCurrentServerConnectionsEstablished, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentServerConnectionsEstablished, 64)
-
-	ch <- prometheus.MustNewConstMetric(
-		modelID, prometheus.GaugeValue, fltModelID, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		mgmtCPUUsage, prometheus.GaugeValue, ns.NSStats.MgmtCPUUsagePcnt, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		memUsage, prometheus.GaugeValue, ns.NSStats.MemUsagePcnt, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		pktCPUUsage, prometheus.GaugeValue, ns.NSStats.PktCPUUsagePcnt, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		flashPartitionUsage, prometheus.GaugeValue, ns.NSStats.FlashPartitionUsage, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		varPartitionUsage, prometheus.GaugeValue, ns.NSStats.VarPartitionUsage, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		totRxMB, prometheus.GaugeValue, fltTotRxMB, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		totTxMB, prometheus.GaugeValue, fltTotTxMB, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		httpRequests, prometheus.GaugeValue, fltHTTPRequests, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		httpResponses, prometheus.GaugeValue, fltHTTPResponses, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		tcpCurrentClientConnections, prometheus.GaugeValue, fltTCPCurrentClientConnections, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		tcpCurrentClientConnectionsEstablished, prometheus.GaugeValue, fltTCPCurrentClientConnectionsEstablished, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		tcpCurrentServerConnections, prometheus.GaugeValue, fltTCPCurrentServerConnections, e.nsInstance,
-	)
-
-	ch <- prometheus.MustNewConstMetric(
-		tcpCurrentServerConnectionsEstablished, prometheus.GaugeValue, fltTCPCurrentServerConnectionsEstablished, e.nsInstance,
-	)
-
-	e.collectInterfacesRxBytes(interfaces)
-	e.interfacesRxBytes.Collect(ch)
-
-	e.collectInterfacesTxBytes(interfaces)
-	e.interfacesTxBytes.Collect(ch)
-
-	e.collectInterfacesRxPackets(interfaces)
-	e.interfacesRxPackets.Collect(ch)
-
-	e.collectInterfacesTxPackets(interfaces)
-	e.interfacesTxPackets.Collect(ch)
-
-	e.collectInterfacesJumboPacketsRx(interfaces)
-	e.interfacesJumboPacketsRx.Collect(ch)
-
-	e.collectInterfacesJumboPacketsTx(interfaces)
-	e.interfacesJumboPacketsTx.Collect(ch)
-
-	e.collectInterfacesErrorPacketsRx(interfaces)
-	e.interfacesErrorPacketsRx.Collect(ch)
-
-	e.collectVirtualServerState(virtualServers)
-	e.virtualServersState.Collect(ch)
-
-	e.collectVirtualServerWaitingRequests(virtualServers)
-	e.virtualServersWaitingRequests.Collect(ch)
-
-	e.collectVirtualServerHealth(virtualServers)
-	e.virtualServersHealth.Collect(ch)
-
-	e.collectVirtualServerInactiveServices(virtualServers)
-	e.virtualServersInactiveServices.Collect(ch)
-
-	e.collectVirtualServerActiveServices(virtualServers)
-	e.virtualServersActiveServices.Collect(ch)
-
-	e.collectVirtualServerTotalHits(virtualServers)
-	e.virtualServersTotalHits.Collect(ch)
-
-	e.collectVirtualServerTotalRequests(virtualServers)
-	e.virtualServersTotalRequests.Collect(ch)
-
-	e.collectVirtualServerTotalResponses(virtualServers)
-	e.virtualServersTotalResponses.Collect(ch)
-
-	e.collectVirtualServerTotalRequestBytes(virtualServers)
-	e.virtualServersTotalRequestBytes.Collect(ch)
-
-	e.collectVirtualServerTotalResponseBytes(virtualServers)
-	e.virtualServersTotalResponseBytes.Collect(ch)
-
-	e.collectVirtualServerCurrentClientConnections(virtualServers)
-	e.virtualServersCurrentClientConnections.Collect(ch)
-
-	e.collectVirtualServerCurrentServerConnections(virtualServers)
-	e.virtualServersCurrentServerConnections.Collect(ch)
-
-	e.collectServicesThroughput(services)
-	e.servicesThroughput.Collect(ch)
-
-	e.collectServicesAvgTTFB(services)
-	e.servicesAvgTTFB.Collect(ch)
-
-	e.collectServicesState(services)
-	e.servicesState.Collect(ch)
-
-	e.collectServicesTotalRequests(services)
-	e.servicesTotalRequests.Collect(ch)
-
-	e.collectServicesTotalResponses(services)
-	e.servicesTotalResponses.Collect(ch)
-
-	e.collectServicesTotalRequestBytes(services)
-	e.servicesTotalRequestBytes.Collect(ch)
-
-	e.collectServicesTotalResponseBytes(services)
-	e.servicesTotalResponseBytes.Collect(ch)
-
-	e.collectServicesCurrentClientConns(services)
-	e.servicesCurrentClientConns.Collect(ch)
-
-	e.collectServicesSurgeCount(services)
-	e.servicesSurgeCount.Collect(ch)
-
-	e.collectServicesCurrentServerConns(services)
-	e.servicesCurrentServerConns.Collect(ch)
-
-	e.collectServicesServerEstablishedConnections(services)
-	e.servicesServerEstablishedConnections.Collect(ch)
-
-	e.collectServicesCurrentReusePool(services)
-	e.servicesCurrentReusePool.Collect(ch)
-
-	e.collectServicesMaxClients(services)
-	e.servicesMaxClients.Collect(ch)
-
-	e.collectServicesCurrentLoad(services)
-	e.servicesCurrentLoad.Collect(ch)
-
-	e.collectServicesVirtualServerServiceHits(services)
-	e.servicesVirtualServerServiceHits.Collect(ch)
-
-	e.collectServicesActiveTransactions(services)
-	e.servicesActiveTransactions.Collect(ch)
-
-	e.collectGSLBServicesState(gslbServices)
-	e.gslbServicesState.Collect(ch)
-
-	e.collectGSLBServicesTotalRequests(gslbServices)
-	e.gslbServicesTotalRequests.Collect(ch)
-
-	e.collectGSLBServicesTotalResponses(gslbServices)
-	e.gslbServicesTotalResponses.Collect(ch)
-
-	e.collectGSLBServicesTotalRequestBytes(gslbServices)
-	e.gslbServicesTotalRequestBytes.Collect(ch)
-
-	e.collectGSLBServicesTotalResponseBytes(gslbServices)
-	e.gslbServicesTotalResponseBytes.Collect(ch)
-
-	e.collectGSLBServicesCurrentClientConns(gslbServices)
-	e.gslbServicesCurrentClientConns.Collect(ch)
-
-	e.collectGSLBServicesCurrentServerConns(gslbServices)
-	e.gslbServicesCurrentServerConns.Collect(ch)
-
-	e.collectGSLBServicesEstablishedConnections(gslbServices)
-	e.gslbServicesEstablishedConnections.Collect(ch)
-
-	e.collectGSLBServicesCurrentLoad(gslbServices)
-	e.gslbServicesCurrentLoad.Collect(ch)
-
-	e.collectGSLBServicesVirtualServerServiceHits(gslbServices)
-	e.gslbServicesVirtualServerServiceHits.Collect(ch)
-
-	e.collectGSLBVirtualServerState(gslbVirtualServers)
-	e.gslbVirtualServersState.Collect(ch)
-
-	e.collectGSLBVirtualServerHealth(gslbVirtualServers)
-	e.gslbVirtualServersHealth.Collect(ch)
-
-	e.collectGSLBVirtualServerInactiveServices(gslbVirtualServers)
-	e.gslbVirtualServersInactiveServices.Collect(ch)
-
-	e.collectGSLBVirtualServerActiveServices(gslbVirtualServers)
-	e.gslbVirtualServersActiveServices.Collect(ch)
-
-	e.collectGSLBVirtualServerTotalHits(gslbVirtualServers)
-	e.gslbVirtualServersTotalHits.Collect(ch)
-
-	e.collectGSLBVirtualServerTotalRequests(gslbVirtualServers)
-	e.gslbVirtualServersTotalRequests.Collect(ch)
-
-	e.collectGSLBVirtualServerTotalResponses(gslbVirtualServers)
-	e.gslbVirtualServersTotalResponses.Collect(ch)
-
-	e.collectGSLBVirtualServerTotalRequestBytes(gslbVirtualServers)
-	e.gslbVirtualServersTotalRequestBytes.Collect(ch)
-
-	e.collectGSLBVirtualServerTotalResponseBytes(gslbVirtualServers)
-	e.gslbVirtualServersTotalResponseBytes.Collect(ch)
-
-	e.collectGSLBVirtualServerCurrentClientConnections(gslbVirtualServers)
-	e.gslbVirtualServersCurrentClientConnections.Collect(ch)
-
-	e.collectGSLBVirtualServerCurrentServerConnections(gslbVirtualServers)
-	e.gslbVirtualServersCurrentServerConnections.Collect(ch)
-
-	e.collectCSVirtualServerState(csVirtualServers)
-	e.csVirtualServersState.Collect(ch)
-
-	e.collectCSVirtualServerTotalHits(csVirtualServers)
-	e.csVirtualServersTotalHits.Collect(ch)
-
-	e.collectCSVirtualServerTotalRequests(csVirtualServers)
-	e.csVirtualServersTotalRequests.Collect(ch)
-
-	e.collectCSVirtualServerTotalResponses(csVirtualServers)
-	e.csVirtualServersTotalResponses.Collect(ch)
-
-	e.collectCSVirtualServerTotalRequestBytes(csVirtualServers)
-	e.csVirtualServersTotalRequestBytes.Collect(ch)
-
-	e.collectCSVirtualServerTotalResponseBytes(csVirtualServers)
-	e.csVirtualServersTotalResponseBytes.Collect(ch)
-
-	e.collectCSVirtualServerCurrentClientConnections(csVirtualServers)
-	e.csVirtualServersCurrentClientConnections.Collect(ch)
-
-	e.collectCSVirtualServerCurrentServerConnections(csVirtualServers)
-	e.csVirtualServersCurrentServerConnections.Collect(ch)
-
-	e.collectCSVirtualServerEstablishedConnections(csVirtualServers)
-	e.csVirtualServersEstablishedConnections.Collect(ch)
-
-	e.collectCSVirtualServerTotalPacketsReceived(csVirtualServers)
-	e.csVirtualServersTotalPacketsReceived.Collect(ch)
-
-	e.collectCSVirtualServerTotalPacketsSent(csVirtualServers)
-	e.csVirtualServersTotalPacketsSent.Collect(ch)
-
-	e.collectCSVirtualServerTotalSpillovers(csVirtualServers)
-	e.csVirtualServersTotalSpillovers.Collect(ch)
-
-	e.collectCSVirtualServerDeferredRequests(csVirtualServers)
-	e.csVirtualServersDeferredRequests.Collect(ch)
-
-	e.collectCSVirtualServerNumberInvalidRequestResponse(csVirtualServers)
-	e.csVirtualServersNumberInvalidRequestResponse.Collect(ch)
-
-	e.collectCSVirtualServerNumberInvalidRequestResponseDropped(csVirtualServers)
-	e.csVirtualServersNumberInvalidRequestResponseDropped.Collect(ch)
-
-	e.collectCSVirtualServerTotalVServerDownBackupHits(csVirtualServers)
-	e.csVirtualServersTotalVServerDownBackupHits.Collect(ch)
-
-	e.collectCSVirtualServerCurrentMultipathSessions(csVirtualServers)
-	e.csVirtualServersCurrentMultipathSessions.Collect(ch)
-
-	e.collectCSVirtualServerCurrentMultipathSubflows(csVirtualServers)
-	e.csVirtualServersCurrentMultipathSubflows.Collect(ch)
-
-	e.collectVPNVirtualServerTotalRequests(vpnVirtualServers)
-	e.vpnVirtualServersTotalRequests.Collect(ch)
-
-	e.collectVPNVirtualServerTotalResponses(vpnVirtualServers)
-	e.vpnVirtualServersTotalResponses.Collect(ch)
-
-	e.collectVPNVirtualServerTotalRequestBytes(vpnVirtualServers)
-	e.vpnVirtualServersTotalRequestBytes.Collect(ch)
-
-	e.collectVPNVirtualServerTotalResponseBytes(vpnVirtualServers)
-	e.vpnVirtualServersTotalResponseBytes.Collect(ch)
-
-	e.collectVPNVirtualServerState(vpnVirtualServers)
-	e.vpnVirtualServersState.Collect(ch)
-
-	e.collectAaaAuthSuccess(aaa)
-	e.aaaAuthSuccess.Collect(ch)
-
-	e.collectAaaAuthFail(aaa)
-	e.aaaAuthFail.Collect(ch)
-
-	e.collectAaaAuthOnlyHTTPSuccess(aaa)
-	e.aaaAuthOnlyHTTPSuccess.Collect(ch)
-
-	e.collectAaaAuthOnlyHTTPFail(aaa)
-	e.aaaAuthOnlyHTTPFail.Collect(ch)
-
-	e.collectAaaCurIcaSessions(aaa)
-	e.aaaCurIcaSessions.Collect(ch)
-
-	e.collectAaaCurIcaOnlyConn(aaa)
-	e.aaaCurIcaOnlyConn.Collect(ch)
-
-	servicegroups, err := netscaler.GetServiceGroups(nsClient, "attrs=servicegroupname")
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-	}
-
-	for _, sg := range servicegroups.ServiceGroups {
-		stats, err2 := netscaler.GetServiceGroupMemberStats(nsClient, sg.Name)
-		if err2 != nil {
-			level.Error(e.logger).Log("msg", err2)
+	// 1. NS Stats
+	run("ns_stats", func() {
+		ns, err := netscaler.GetNSStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get NS stats", "err", err)
+			return
 		}
 
-		for _, s := range stats.ServiceGroups[0].ServiceGroupMembers {
-			servicegroupnameParts := strings.Split(s.ServiceGroupName, "?")
+		fltTotRxMB, _ := strconv.ParseFloat(ns.NSStats.TotalReceivedMB, 64)
+		fltTotTxMB, _ := strconv.ParseFloat(ns.NSStats.TotalTransmitMB, 64)
+		fltHTTPRequests, _ := strconv.ParseFloat(ns.NSStats.HTTPRequests, 64)
+		fltHTTPResponses, _ := strconv.ParseFloat(ns.NSStats.HTTPResponses, 64)
+		fltTCPCurrentClientConnections, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentClientConnections, 64)
+		fltTCPCurrentClientConnectionsEstablished, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentClientConnectionsEstablished, 64)
+		fltTCPCurrentServerConnections, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentServerConnections, 64)
+		fltTCPCurrentServerConnectionsEstablished, _ := strconv.ParseFloat(ns.NSStats.TCPCurrentServerConnectionsEstablished, 64)
 
-			e.collectServiceGroupsState(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsState.Collect(ch)
+		ch <- prometheus.MustNewConstMetric(e.mgmtCPUUsage, prometheus.GaugeValue, ns.NSStats.MgmtCPUUsagePcnt, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.memUsage, prometheus.GaugeValue, ns.NSStats.MemUsagePcnt, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.pktCPUUsage, prometheus.GaugeValue, ns.NSStats.PktCPUUsagePcnt, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.flashPartitionUsage, prometheus.GaugeValue, ns.NSStats.FlashPartitionUsage, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.varPartitionUsage, prometheus.GaugeValue, ns.NSStats.VarPartitionUsage, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.totRxMB, prometheus.GaugeValue, fltTotRxMB, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.totTxMB, prometheus.GaugeValue, fltTotTxMB, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.httpRequests, prometheus.GaugeValue, fltHTTPRequests, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.httpResponses, prometheus.GaugeValue, fltHTTPResponses, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.tcpCurrentClientConnections, prometheus.GaugeValue, fltTCPCurrentClientConnections, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.tcpCurrentClientConnectionsEstablished, prometheus.GaugeValue, fltTCPCurrentClientConnectionsEstablished, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.tcpCurrentServerConnections, prometheus.GaugeValue, fltTCPCurrentServerConnections, nsInstance)
+		ch <- prometheus.MustNewConstMetric(e.tcpCurrentServerConnectionsEstablished, prometheus.GaugeValue, fltTCPCurrentServerConnectionsEstablished, nsInstance)
+	})
 
-			e.collectServiceGroupsAvgTTFB(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsAvgTTFB.Collect(ch)
-
-			e.collectServiceGroupsTotalRequests(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsTotalRequests.Collect(ch)
-
-			e.collectServiceGroupsTotalResponses(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsTotalResponses.Collect(ch)
-
-			e.collectServiceGroupsTotalRequestBytes(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsTotalRequestBytes.Collect(ch)
-
-			e.collectServiceGroupsTotalResponseBytes(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsTotalResponseBytes.Collect(ch)
-
-			e.collectServiceGroupsCurrentClientConnections(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsCurrentClientConnections.Collect(ch)
-
-			e.collectServiceGroupsSurgeCount(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsSurgeCount.Collect(ch)
-
-			e.collectServiceGroupsCurrentServerConnections(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsCurrentServerConnections.Collect(ch)
-
-			e.collectServiceGroupsServerEstablishedConnections(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsServerEstablishedConnections.Collect(ch)
-
-			e.collectServiceGroupsCurrentReusePool(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsCurrentReusePool.Collect(ch)
-
-			e.collectServiceGroupsMaxClients(s, sg.Name, servicegroupnameParts[1])
-			e.serviceGroupsMaxClients.Collect(ch)
+	// 2. NS License
+	run("ns_license", func() {
+		nslicense, err := netscaler.GetNSLicense(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get NS license", "err", err)
+			return
 		}
+		fltModelID, _ := strconv.ParseFloat(nslicense.NSLicense.ModelID, 64)
+		ch <- prometheus.MustNewConstMetric(e.modelID, prometheus.GaugeValue, fltModelID, nsInstance)
+	})
+
+	// 3. Interfaces
+	run("interfaces", func() {
+		interfaces, err := netscaler.GetInterfaceStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get interface stats", "err", err)
+			return
+		}
+		e.collectInterfacesRxBytes(interfaces, nsInstance)
+		e.interfacesRxBytes.Collect(ch)
+		e.collectInterfacesTxBytes(interfaces, nsInstance)
+		e.interfacesTxBytes.Collect(ch)
+		e.collectInterfacesRxPackets(interfaces, nsInstance)
+		e.interfacesRxPackets.Collect(ch)
+		e.collectInterfacesTxPackets(interfaces, nsInstance)
+		e.interfacesTxPackets.Collect(ch)
+		e.collectInterfacesJumboPacketsRx(interfaces, nsInstance)
+		e.interfacesJumboPacketsRx.Collect(ch)
+		e.collectInterfacesJumboPacketsTx(interfaces, nsInstance)
+		e.interfacesJumboPacketsTx.Collect(ch)
+		e.collectInterfacesErrorPacketsRx(interfaces, nsInstance)
+		e.interfacesErrorPacketsRx.Collect(ch)
+	})
+
+	// 4. Virtual Servers
+	run("virtual_servers", func() {
+		virtualServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get virtual server stats", "err", err)
+			return
+		}
+		e.collectVirtualServerState(virtualServers, nsInstance)
+		e.virtualServersState.Collect(ch)
+		e.collectVirtualServerWaitingRequests(virtualServers, nsInstance)
+		e.virtualServersWaitingRequests.Collect(ch)
+		e.collectVirtualServerHealth(virtualServers, nsInstance)
+		e.virtualServersHealth.Collect(ch)
+		e.collectVirtualServerInactiveServices(virtualServers, nsInstance)
+		e.virtualServersInactiveServices.Collect(ch)
+		e.collectVirtualServerActiveServices(virtualServers, nsInstance)
+		e.virtualServersActiveServices.Collect(ch)
+		e.collectVirtualServerTotalHits(virtualServers, nsInstance)
+		e.virtualServersTotalHits.Collect(ch)
+		e.collectVirtualServerTotalRequests(virtualServers, nsInstance)
+		e.virtualServersTotalRequests.Collect(ch)
+		e.collectVirtualServerTotalResponses(virtualServers, nsInstance)
+		e.virtualServersTotalResponses.Collect(ch)
+		e.collectVirtualServerTotalRequestBytes(virtualServers, nsInstance)
+		e.virtualServersTotalRequestBytes.Collect(ch)
+		e.collectVirtualServerTotalResponseBytes(virtualServers, nsInstance)
+		e.virtualServersTotalResponseBytes.Collect(ch)
+		e.collectVirtualServerCurrentClientConnections(virtualServers, nsInstance)
+		e.virtualServersCurrentClientConnections.Collect(ch)
+		e.collectVirtualServerCurrentServerConnections(virtualServers, nsInstance)
+		e.virtualServersCurrentServerConnections.Collect(ch)
+	})
+
+	// 5. Services
+	run("services", func() {
+		services, err := netscaler.GetServiceStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get service stats", "err", err)
+			return
+		}
+		e.collectServicesThroughput(services, nsInstance)
+		e.servicesThroughput.Collect(ch)
+		e.collectServicesAvgTTFB(services, nsInstance)
+		e.servicesAvgTTFB.Collect(ch)
+		e.collectServicesState(services, nsInstance)
+		e.servicesState.Collect(ch)
+		e.collectServicesTotalRequests(services, nsInstance)
+		e.servicesTotalRequests.Collect(ch)
+		e.collectServicesTotalResponses(services, nsInstance)
+		e.servicesTotalResponses.Collect(ch)
+		e.collectServicesTotalRequestBytes(services, nsInstance)
+		e.servicesTotalRequestBytes.Collect(ch)
+		e.collectServicesTotalResponseBytes(services, nsInstance)
+		e.servicesTotalResponseBytes.Collect(ch)
+		e.collectServicesCurrentClientConns(services, nsInstance)
+		e.servicesCurrentClientConns.Collect(ch)
+		e.collectServicesSurgeCount(services, nsInstance)
+		e.servicesSurgeCount.Collect(ch)
+		e.collectServicesCurrentServerConns(services, nsInstance)
+		e.servicesCurrentServerConns.Collect(ch)
+		e.collectServicesServerEstablishedConnections(services, nsInstance)
+		e.servicesServerEstablishedConnections.Collect(ch)
+		e.collectServicesCurrentReusePool(services, nsInstance)
+		e.servicesCurrentReusePool.Collect(ch)
+		e.collectServicesMaxClients(services, nsInstance)
+		e.servicesMaxClients.Collect(ch)
+		e.collectServicesCurrentLoad(services, nsInstance)
+		e.servicesCurrentLoad.Collect(ch)
+		e.collectServicesVirtualServerServiceHits(services, nsInstance)
+		e.servicesVirtualServerServiceHits.Collect(ch)
+		e.collectServicesActiveTransactions(services, nsInstance)
+		e.servicesActiveTransactions.Collect(ch)
+	})
+
+	// 6. GSLB Services
+	run("gslb_services", func() {
+		gslbServices, err := netscaler.GetGSLBServiceStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get GSLB service stats", "err", err)
+			return
+		}
+		e.collectGSLBServicesState(gslbServices, nsInstance)
+		e.gslbServicesState.Collect(ch)
+		e.collectGSLBServicesTotalRequests(gslbServices, nsInstance)
+		e.gslbServicesTotalRequests.Collect(ch)
+		e.collectGSLBServicesTotalResponses(gslbServices, nsInstance)
+		e.gslbServicesTotalResponses.Collect(ch)
+		e.collectGSLBServicesTotalRequestBytes(gslbServices, nsInstance)
+		e.gslbServicesTotalRequestBytes.Collect(ch)
+		e.collectGSLBServicesTotalResponseBytes(gslbServices, nsInstance)
+		e.gslbServicesTotalResponseBytes.Collect(ch)
+		e.collectGSLBServicesCurrentClientConns(gslbServices, nsInstance)
+		e.gslbServicesCurrentClientConns.Collect(ch)
+		e.collectGSLBServicesCurrentServerConns(gslbServices, nsInstance)
+		e.gslbServicesCurrentServerConns.Collect(ch)
+		e.collectGSLBServicesEstablishedConnections(gslbServices, nsInstance)
+		e.gslbServicesEstablishedConnections.Collect(ch)
+		e.collectGSLBServicesCurrentLoad(gslbServices, nsInstance)
+		e.gslbServicesCurrentLoad.Collect(ch)
+		e.collectGSLBServicesVirtualServerServiceHits(gslbServices, nsInstance)
+		e.gslbServicesVirtualServerServiceHits.Collect(ch)
+	})
+
+	// 7. GSLB Virtual Servers
+	run("gslb_vservers", func() {
+		gslbVirtualServers, err := netscaler.GetGSLBVirtualServerStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get GSLB virtual server stats", "err", err)
+			return
+		}
+		e.collectGSLBVirtualServerState(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersState.Collect(ch)
+		e.collectGSLBVirtualServerHealth(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersHealth.Collect(ch)
+		e.collectGSLBVirtualServerInactiveServices(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersInactiveServices.Collect(ch)
+		e.collectGSLBVirtualServerActiveServices(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersActiveServices.Collect(ch)
+		e.collectGSLBVirtualServerTotalHits(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersTotalHits.Collect(ch)
+		e.collectGSLBVirtualServerTotalRequests(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersTotalRequests.Collect(ch)
+		e.collectGSLBVirtualServerTotalResponses(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersTotalResponses.Collect(ch)
+		e.collectGSLBVirtualServerTotalRequestBytes(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersTotalRequestBytes.Collect(ch)
+		e.collectGSLBVirtualServerTotalResponseBytes(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersTotalResponseBytes.Collect(ch)
+		e.collectGSLBVirtualServerCurrentClientConnections(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersCurrentClientConnections.Collect(ch)
+		e.collectGSLBVirtualServerCurrentServerConnections(gslbVirtualServers, nsInstance)
+		e.gslbVirtualServersCurrentServerConnections.Collect(ch)
+	})
+
+	// 8. CS Virtual Servers
+	run("cs_vservers", func() {
+		csVirtualServers, err := netscaler.GetCSVirtualServerStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get CS virtual server stats", "err", err)
+			return
+		}
+		e.collectCSVirtualServerState(csVirtualServers, nsInstance)
+		e.csVirtualServersState.Collect(ch)
+		e.collectCSVirtualServerTotalHits(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalHits.Collect(ch)
+		e.collectCSVirtualServerTotalRequests(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalRequests.Collect(ch)
+		e.collectCSVirtualServerTotalResponses(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalResponses.Collect(ch)
+		e.collectCSVirtualServerTotalRequestBytes(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalRequestBytes.Collect(ch)
+		e.collectCSVirtualServerTotalResponseBytes(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalResponseBytes.Collect(ch)
+		e.collectCSVirtualServerCurrentClientConnections(csVirtualServers, nsInstance)
+		e.csVirtualServersCurrentClientConnections.Collect(ch)
+		e.collectCSVirtualServerCurrentServerConnections(csVirtualServers, nsInstance)
+		e.csVirtualServersCurrentServerConnections.Collect(ch)
+		e.collectCSVirtualServerEstablishedConnections(csVirtualServers, nsInstance)
+		e.csVirtualServersEstablishedConnections.Collect(ch)
+		e.collectCSVirtualServerTotalPacketsReceived(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalPacketsReceived.Collect(ch)
+		e.collectCSVirtualServerTotalPacketsSent(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalPacketsSent.Collect(ch)
+		e.collectCSVirtualServerTotalSpillovers(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalSpillovers.Collect(ch)
+		e.collectCSVirtualServerDeferredRequests(csVirtualServers, nsInstance)
+		e.csVirtualServersDeferredRequests.Collect(ch)
+		e.collectCSVirtualServerNumberInvalidRequestResponse(csVirtualServers, nsInstance)
+		e.csVirtualServersNumberInvalidRequestResponse.Collect(ch)
+		e.collectCSVirtualServerNumberInvalidRequestResponseDropped(csVirtualServers, nsInstance)
+		e.csVirtualServersNumberInvalidRequestResponseDropped.Collect(ch)
+		e.collectCSVirtualServerTotalVServerDownBackupHits(csVirtualServers, nsInstance)
+		e.csVirtualServersTotalVServerDownBackupHits.Collect(ch)
+		e.collectCSVirtualServerCurrentMultipathSessions(csVirtualServers, nsInstance)
+		e.csVirtualServersCurrentMultipathSessions.Collect(ch)
+		e.collectCSVirtualServerCurrentMultipathSubflows(csVirtualServers, nsInstance)
+		e.csVirtualServersCurrentMultipathSubflows.Collect(ch)
+	})
+
+	// 9. VPN Virtual Servers
+	run("vpn_vservers", func() {
+		vpnVirtualServers, err := netscaler.GetVPNVirtualServerStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get VPN virtual server stats", "err", err)
+			return
+		}
+		e.collectVPNVirtualServerTotalRequests(vpnVirtualServers, nsInstance)
+		e.vpnVirtualServersTotalRequests.Collect(ch)
+		e.collectVPNVirtualServerTotalResponses(vpnVirtualServers, nsInstance)
+		e.vpnVirtualServersTotalResponses.Collect(ch)
+		e.collectVPNVirtualServerTotalRequestBytes(vpnVirtualServers, nsInstance)
+		e.vpnVirtualServersTotalRequestBytes.Collect(ch)
+		e.collectVPNVirtualServerTotalResponseBytes(vpnVirtualServers, nsInstance)
+		e.vpnVirtualServersTotalResponseBytes.Collect(ch)
+		e.collectVPNVirtualServerState(vpnVirtualServers, nsInstance)
+		e.vpnVirtualServersState.Collect(ch)
+	})
+
+	// 10. AAA Stats
+	run("aaa_stats", func() {
+		aaa, err := netscaler.GetAAAStats(ctx, nsClient, "")
+		if err != nil {
+			e.logger.Error("failed to get AAA stats", "err", err)
+			return
+		}
+		e.collectAaaAuthSuccess(aaa, nsInstance)
+		e.aaaAuthSuccess.Collect(ch)
+		e.collectAaaAuthFail(aaa, nsInstance)
+		e.aaaAuthFail.Collect(ch)
+		e.collectAaaAuthOnlyHTTPSuccess(aaa, nsInstance)
+		e.aaaAuthOnlyHTTPSuccess.Collect(ch)
+		e.collectAaaAuthOnlyHTTPFail(aaa, nsInstance)
+		e.aaaAuthOnlyHTTPFail.Collect(ch)
+		e.collectAaaCurIcaSessions(aaa, nsInstance)
+		e.aaaCurIcaSessions.Collect(ch)
+		e.collectAaaCurIcaOnlyConn(aaa, nsInstance)
+		e.aaaCurIcaOnlyConn.Collect(ch)
+	})
+
+	// 11. Service Groups (Nested parallelization)
+	run("service_groups", func() {
+		servicegroups, err := netscaler.GetServiceGroups(ctx, nsClient, "attrs=servicegroupname")
+		if err != nil {
+			e.logger.Error("failed to get service groups", "err", err)
+			return
+		}
+
+		// We need to fetch stats for each service group member.
+		// We reuse the parent 'run' helper mechanism by manually managing the WaitGroup here
+		// because we want these to ALSO be subject to the global semaphore.
+
+		for _, sg := range servicegroups.ServiceGroups {
+			sgName := sg.Name // Capture for closure
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				select {
+				case sem <- struct{}{}:
+					defer func() { <-sem }()
+				case <-ctx.Done():
+					return
+				}
+
+				stats, err2 := netscaler.GetServiceGroupMemberStats(ctx, nsClient, sgName)
+				if err2 != nil {
+					e.logger.Error("failed to get service group member stats", "err", err2)
+					return
+				}
+
+				if len(stats.ServiceGroups) == 0 {
+					return
+				}
+
+				for _, s := range stats.ServiceGroups[0].ServiceGroupMembers {
+					servicegroupnameParts := strings.Split(s.ServiceGroupName, "?")
+					memberName := ""
+					if len(servicegroupnameParts) > 1 {
+						memberName = servicegroupnameParts[1]
+					}
+
+					e.collectServiceGroupsState(s, sgName, memberName, nsInstance)
+					e.serviceGroupsState.Collect(ch)
+					e.collectServiceGroupsAvgTTFB(s, sgName, memberName, nsInstance)
+					e.serviceGroupsAvgTTFB.Collect(ch)
+					e.collectServiceGroupsTotalRequests(s, sgName, memberName, nsInstance)
+					e.serviceGroupsTotalRequests.Collect(ch)
+					e.collectServiceGroupsTotalResponses(s, sgName, memberName, nsInstance)
+					e.serviceGroupsTotalResponses.Collect(ch)
+					e.collectServiceGroupsTotalRequestBytes(s, sgName, memberName, nsInstance)
+					e.serviceGroupsTotalRequestBytes.Collect(ch)
+					e.collectServiceGroupsTotalResponseBytes(s, sgName, memberName, nsInstance)
+					e.serviceGroupsTotalResponseBytes.Collect(ch)
+					e.collectServiceGroupsCurrentClientConnections(s, sgName, memberName, nsInstance)
+					e.serviceGroupsCurrentClientConnections.Collect(ch)
+					e.collectServiceGroupsSurgeCount(s, sgName, memberName, nsInstance)
+					e.serviceGroupsSurgeCount.Collect(ch)
+					e.collectServiceGroupsCurrentServerConnections(s, sgName, memberName, nsInstance)
+					e.serviceGroupsCurrentServerConnections.Collect(ch)
+					e.collectServiceGroupsServerEstablishedConnections(s, sgName, memberName, nsInstance)
+					e.serviceGroupsServerEstablishedConnections.Collect(ch)
+					e.collectServiceGroupsCurrentReusePool(s, sgName, memberName, nsInstance)
+					e.serviceGroupsCurrentReusePool.Collect(ch)
+					e.collectServiceGroupsMaxClients(s, sgName, memberName, nsInstance)
+					e.serviceGroupsMaxClients.Collect(ch)
+				}
+			}()
+		}
+	})
+
+	// 12. Topology metrics (optional)
+	if target.CollectTopology {
+		run("topology", func() {
+			e.collectTopologyMetrics(ctx, nsClient, nsInstance, ch)
+		})
 	}
 
-	err = netscaler.Disconnect(nsClient)
-	if err != nil {
-		level.Error(e.logger).Log("msg", err)
-		return
-	}
+	wg.Wait()
 }

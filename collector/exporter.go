@@ -1,11 +1,10 @@
 package collector
 
 import (
-	"errors"
-
-	"github.com/go-kit/kit/log"
+	"log/slog"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/elohmeier/netscaler-exporter/config"
 )
 
 // Exporter represents the metrics exported to Prometheus
@@ -36,20 +35,20 @@ type Exporter struct {
 	virtualServersHealth                                *prometheus.GaugeVec
 	virtualServersInactiveServices                      *prometheus.GaugeVec
 	virtualServersActiveServices                        *prometheus.GaugeVec
-	virtualServersTotalHits                             *prometheus.CounterVec
-	virtualServersTotalRequests                         *prometheus.CounterVec
-	virtualServersTotalResponses                        *prometheus.CounterVec
-	virtualServersTotalRequestBytes                     *prometheus.CounterVec
-	virtualServersTotalResponseBytes                    *prometheus.CounterVec
+	virtualServersTotalHits                             *prometheus.GaugeVec
+	virtualServersTotalRequests                         *prometheus.GaugeVec
+	virtualServersTotalResponses                        *prometheus.GaugeVec
+	virtualServersTotalRequestBytes                     *prometheus.GaugeVec
+	virtualServersTotalResponseBytes                    *prometheus.GaugeVec
 	virtualServersCurrentClientConnections              *prometheus.GaugeVec
 	virtualServersCurrentServerConnections              *prometheus.GaugeVec
-	servicesThroughput                                  *prometheus.CounterVec
+	servicesThroughput                                  *prometheus.GaugeVec
 	servicesAvgTTFB                                     *prometheus.GaugeVec
 	servicesState                                       *prometheus.GaugeVec
-	servicesTotalRequests                               *prometheus.CounterVec
-	servicesTotalResponses                              *prometheus.CounterVec
-	servicesTotalRequestBytes                           *prometheus.CounterVec
-	servicesTotalResponseBytes                          *prometheus.CounterVec
+	servicesTotalRequests                               *prometheus.GaugeVec
+	servicesTotalResponses                              *prometheus.GaugeVec
+	servicesTotalRequestBytes                           *prometheus.GaugeVec
+	servicesTotalResponseBytes                          *prometheus.GaugeVec
 	servicesCurrentClientConns                          *prometheus.GaugeVec
 	servicesSurgeCount                                  *prometheus.GaugeVec
 	servicesCurrentServerConns                          *prometheus.GaugeVec
@@ -57,14 +56,14 @@ type Exporter struct {
 	servicesCurrentReusePool                            *prometheus.GaugeVec
 	servicesMaxClients                                  *prometheus.GaugeVec
 	servicesCurrentLoad                                 *prometheus.GaugeVec
-	servicesVirtualServerServiceHits                    *prometheus.CounterVec
+	servicesVirtualServerServiceHits                    *prometheus.GaugeVec
 	servicesActiveTransactions                          *prometheus.GaugeVec
 	serviceGroupsState                                  *prometheus.GaugeVec
 	serviceGroupsAvgTTFB                                *prometheus.GaugeVec
-	serviceGroupsTotalRequests                          *prometheus.CounterVec
-	serviceGroupsTotalResponses                         *prometheus.CounterVec
-	serviceGroupsTotalRequestBytes                      *prometheus.CounterVec
-	serviceGroupsTotalResponseBytes                     *prometheus.CounterVec
+	serviceGroupsTotalRequests                          *prometheus.GaugeVec
+	serviceGroupsTotalResponses                         *prometheus.GaugeVec
+	serviceGroupsTotalRequestBytes                      *prometheus.GaugeVec
+	serviceGroupsTotalResponseBytes                     *prometheus.GaugeVec
 	serviceGroupsCurrentClientConnections               *prometheus.GaugeVec
 	serviceGroupsSurgeCount                             *prometheus.GaugeVec
 	serviceGroupsCurrentServerConnections               *prometheus.GaugeVec
@@ -72,77 +71,63 @@ type Exporter struct {
 	serviceGroupsCurrentReusePool                       *prometheus.GaugeVec
 	serviceGroupsMaxClients                             *prometheus.GaugeVec
 	gslbServicesState                                   *prometheus.GaugeVec
-	gslbServicesTotalRequests                           *prometheus.CounterVec
-	gslbServicesTotalResponses                          *prometheus.CounterVec
-	gslbServicesTotalRequestBytes                       *prometheus.CounterVec
-	gslbServicesTotalResponseBytes                      *prometheus.CounterVec
+	gslbServicesTotalRequests                           *prometheus.GaugeVec
+	gslbServicesTotalResponses                          *prometheus.GaugeVec
+	gslbServicesTotalRequestBytes                       *prometheus.GaugeVec
+	gslbServicesTotalResponseBytes                      *prometheus.GaugeVec
 	gslbServicesCurrentClientConns                      *prometheus.GaugeVec
 	gslbServicesCurrentServerConns                      *prometheus.GaugeVec
 	gslbServicesCurrentLoad                             *prometheus.GaugeVec
-	gslbServicesVirtualServerServiceHits                *prometheus.CounterVec
+	gslbServicesVirtualServerServiceHits                *prometheus.GaugeVec
 	gslbServicesEstablishedConnections                  *prometheus.GaugeVec
 	gslbVirtualServersState                             *prometheus.GaugeVec
 	gslbVirtualServersHealth                            *prometheus.GaugeVec
 	gslbVirtualServersInactiveServices                  *prometheus.GaugeVec
 	gslbVirtualServersActiveServices                    *prometheus.GaugeVec
-	gslbVirtualServersTotalHits                         *prometheus.CounterVec
-	gslbVirtualServersTotalRequests                     *prometheus.CounterVec
-	gslbVirtualServersTotalResponses                    *prometheus.CounterVec
-	gslbVirtualServersTotalRequestBytes                 *prometheus.CounterVec
-	gslbVirtualServersTotalResponseBytes                *prometheus.CounterVec
+	gslbVirtualServersTotalHits                         *prometheus.GaugeVec
+	gslbVirtualServersTotalRequests                     *prometheus.GaugeVec
+	gslbVirtualServersTotalResponses                    *prometheus.GaugeVec
+	gslbVirtualServersTotalRequestBytes                 *prometheus.GaugeVec
+	gslbVirtualServersTotalResponseBytes                *prometheus.GaugeVec
 	gslbVirtualServersCurrentClientConnections          *prometheus.GaugeVec
 	gslbVirtualServersCurrentServerConnections          *prometheus.GaugeVec
 	csVirtualServersState                               *prometheus.GaugeVec
-	csVirtualServersTotalHits                           *prometheus.CounterVec
-	csVirtualServersTotalRequests                       *prometheus.CounterVec
-	csVirtualServersTotalResponses                      *prometheus.CounterVec
-	csVirtualServersTotalRequestBytes                   *prometheus.CounterVec
-	csVirtualServersTotalResponseBytes                  *prometheus.CounterVec
+	csVirtualServersTotalHits                           *prometheus.GaugeVec
+	csVirtualServersTotalRequests                       *prometheus.GaugeVec
+	csVirtualServersTotalResponses                      *prometheus.GaugeVec
+	csVirtualServersTotalRequestBytes                   *prometheus.GaugeVec
+	csVirtualServersTotalResponseBytes                  *prometheus.GaugeVec
 	csVirtualServersCurrentClientConnections            *prometheus.GaugeVec
 	csVirtualServersCurrentServerConnections            *prometheus.GaugeVec
 	csVirtualServersEstablishedConnections              *prometheus.GaugeVec
-	csVirtualServersTotalPacketsReceived                *prometheus.CounterVec
-	csVirtualServersTotalPacketsSent                    *prometheus.CounterVec
-	csVirtualServersTotalSpillovers                     *prometheus.CounterVec
-	csVirtualServersDeferredRequests                    *prometheus.CounterVec
-	csVirtualServersNumberInvalidRequestResponse        *prometheus.CounterVec
-	csVirtualServersNumberInvalidRequestResponseDropped *prometheus.CounterVec
-	csVirtualServersTotalVServerDownBackupHits          *prometheus.CounterVec
+	csVirtualServersTotalPacketsReceived                *prometheus.GaugeVec
+	csVirtualServersTotalPacketsSent                    *prometheus.GaugeVec
+	csVirtualServersTotalSpillovers                     *prometheus.GaugeVec
+	csVirtualServersDeferredRequests                    *prometheus.GaugeVec
+	csVirtualServersNumberInvalidRequestResponse        *prometheus.GaugeVec
+	csVirtualServersNumberInvalidRequestResponseDropped *prometheus.GaugeVec
+	csVirtualServersTotalVServerDownBackupHits          *prometheus.GaugeVec
 	csVirtualServersCurrentMultipathSessions            *prometheus.GaugeVec
 	csVirtualServersCurrentMultipathSubflows            *prometheus.GaugeVec
-	vpnVirtualServersTotalRequests                      *prometheus.CounterVec
-	vpnVirtualServersTotalResponses                     *prometheus.CounterVec
-	vpnVirtualServersTotalRequestBytes                  *prometheus.CounterVec
-	vpnVirtualServersTotalResponseBytes                 *prometheus.CounterVec
+	vpnVirtualServersTotalRequests                      *prometheus.GaugeVec
+	vpnVirtualServersTotalResponses                     *prometheus.GaugeVec
+	vpnVirtualServersTotalRequestBytes                  *prometheus.GaugeVec
+	vpnVirtualServersTotalResponseBytes                 *prometheus.GaugeVec
 	vpnVirtualServersState                              *prometheus.GaugeVec
-	aaaAuthSuccess                                      *prometheus.CounterVec
-	aaaAuthFail                                         *prometheus.CounterVec
-	aaaAuthOnlyHTTPSuccess                              *prometheus.CounterVec
-	aaaAuthOnlyHTTPFail                                 *prometheus.CounterVec
-	aaaCurIcaSessions                                   *prometheus.CounterVec
-	aaaCurIcaOnlyConn                                   *prometheus.CounterVec
-	username                                            string
-	password                                            string
-	url                                                 string
-	ignoreCert                                          bool
-	logger                                              log.Logger
-	nsInstance                                          string
+	aaaAuthSuccess                                      *prometheus.GaugeVec
+	aaaAuthFail                                         *prometheus.GaugeVec
+	aaaAuthOnlyHTTPSuccess                              *prometheus.GaugeVec
+	aaaAuthOnlyHTTPFail                                 *prometheus.GaugeVec
+	aaaCurIcaSessions                                   *prometheus.GaugeVec
+	aaaCurIcaOnlyConn                                   *prometheus.GaugeVec
+	topologyNode                                        *prometheus.GaugeVec
+	topologyEdge                                        *prometheus.GaugeVec
+	targets                                             []config.Target
+	logger                                              *slog.Logger
 }
 
-// NewExporter initialises the exporter
-func NewExporter(url string, username string, password string, ignoreCert bool, logger log.Logger, nsInstance string) (*Exporter, error) {
-	if url == "" {
-		return nil, errors.New("no Url Specified")
-	}
-
-	if username == "" {
-		return nil, errors.New("no Username Specified")
-	}
-
-	if password == "" {
-		return nil, errors.New("no Password Specified")
-	}
-
+// NewExporter initialises the exporter with the given targets
+func NewExporter(targets []config.Target, logger *slog.Logger) (*Exporter, error) {
 	return &Exporter{
 		modelID:                                             modelID,
 		mgmtCPUUsage:                                        mgmtCPUUsage,
@@ -255,12 +240,10 @@ func NewExporter(url string, username string, password string, ignoreCert bool, 
 		aaaAuthOnlyHTTPFail:                                 aaaAuthOnlyHTTPFail,
 		aaaCurIcaSessions:                                   aaaCurIcaSessions,
 		aaaCurIcaOnlyConn:                                   aaaCurIcaOnlyConn,
-		username:                                            username,
-		password:                                            password,
-		url:                                                 url,
-		ignoreCert:                                          ignoreCert,
+		topologyNode:                                        topologyNode,
+		topologyEdge:                                        topologyEdge,
+		targets:                                             targets,
 		logger:                                              logger,
-		nsInstance:                                          nsInstance,
 	}, nil
 }
 
@@ -386,4 +369,13 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.aaaAuthOnlyHTTPFail.Describe(ch)
 	e.aaaCurIcaSessions.Describe(ch)
 	e.aaaCurIcaOnlyConn.Describe(ch)
+
+	// Check if any target has topology collection enabled
+	for _, t := range e.targets {
+		if t.CollectTopology {
+			e.topologyNode.Describe(ch)
+			e.topologyEdge.Describe(ch)
+			break
+		}
+	}
 }

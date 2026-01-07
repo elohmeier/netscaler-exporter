@@ -3,125 +3,111 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-
-	"github.com/rokett/citrix-netscaler-exporter/collector"
+	"github.com/elohmeier/netscaler-exporter/collector"
+	"github.com/elohmeier/netscaler-exporter/config"
 )
 
 var (
-	app        = "Citrix-NetScaler-Exporter"
-	version    string
-	build      string
-	username   = flag.String("username", "", "Username with which to connect to the NetScaler API")
-	password   = flag.String("password", "", "Password with which to connect to the NetScaler API")
-	bindPort   = flag.Int("bind_port", 9280, "Port to bind the exporter endpoint to")
-	versionFlg = flag.Bool("version", false, "Display application version")
-	debugFlg   = flag.Bool("debug", false, "Enable debug logging?")
-	logger     log.Logger
-
-	nsInstance string
+	app     = "Citrix-NetScaler-Exporter"
+	version string
+	build   string
 )
 
 func main() {
+	var (
+		targetsFile  string
+		targets      string
+		bindPort     int
+		showVersion  bool
+		debug        bool
+	)
+
+	flag.StringVar(&targetsFile, "targets-file", "", "Path to YAML/JSON file containing target configurations")
+	flag.StringVar(&targets, "targets", "", "Inline YAML/JSON target configuration")
+	flag.IntVar(&bindPort, "bind-port", 9280, "Port to bind the exporter endpoint to")
+	flag.BoolVar(&showVersion, "version", false, "Display application version")
+	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
 	flag.Parse()
 
-	if *versionFlg {
+	if showVersion {
 		fmt.Printf("%s v%s build %s\n", app, version, build)
 		os.Exit(0)
 	}
 
-	if *username == "" || *password == "" {
-		flag.PrintDefaults()
+	logLevel := slog.LevelInfo
+	if debug {
+		logLevel = slog.LevelDebug
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     logLevel,
+		AddSource: true,
+	})).With("app", app, "version", "v"+version, "build", build)
+
+	// Load configuration
+	var cfg *config.Config
+	var err error
+
+	if targetsFile != "" && targets != "" {
+		logger.Error("cannot specify both -targets-file and -targets")
 		os.Exit(1)
 	}
 
-	logger = log.NewLogfmtLogger(os.Stdout)
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller, "app", app, "bind_port", *bindPort, "version", "v"+version, "build", build)
+	if targetsFile != "" {
+		cfg, err = config.LoadFile(targetsFile)
+	} else if targets != "" {
+		cfg, err = config.Parse(targets)
+	} else {
+		logger.Error("must specify either -targets-file or -targets")
+		flag.Usage()
+		os.Exit(1)
+	}
 
+	if err != nil {
+		logger.Error("failed to load configuration", "err", err)
+		os.Exit(1)
+	}
+
+	logger.Info("loaded configuration", "targets", len(cfg.Targets))
+
+	// Create exporter with all targets
+	exporter, err := collector.NewExporter(cfg.Targets, logger)
+	if err != nil {
+		logger.Error("failed to create exporter", "err", err)
+		os.Exit(1)
+	}
+
+	// Register with default Prometheus registry
+	prometheus.MustRegister(exporter)
+
+	// Setup HTTP handlers
+	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
-				<head><title>Citrix NetScaler Exporter</title></head>
-				<style>
-				label{
-				display:inline-block;
-				width:75px;
-				}
-				form label {
-				margin: 10px;
-				}
-				form input {
-				margin: 10px;
-				}
-				</style>
-				<body>
-				<h1>Citrix NetScaler Exporter</h1>
-				<form action="/netscaler">
-				<label>Target:</label> <input type="text" name="target" placeholder="https://netscaler.domain.tld"> <br>
-				<p>Ignore certificate check?</p>
-				<input type="radio" id="yes" name="ignore-cert" value="yes">
-				<label for="yes">Yes</label>
-				<input type="radio" id="no" name="ignore-cert" value="no" checked>
-  				<label for="no">No</label>
-				<br>
-				<input type="submit" value="Submit">
-				</form>
-				</body>
-				</html>`))
+		w.Write([]byte(app + " - /metrics for Prometheus metrics"))
 	})
 
-	http.HandleFunc("/netscaler", handler)
-	http.Handle("/metrics", promhttp.Handler())
+	listenAddr := ":" + strconv.Itoa(bindPort)
+	logger.Info("starting server", "addr", listenAddr)
 
-	listeningPort := ":" + strconv.Itoa(*bindPort)
-	level.Info(logger).Log("msg", "Listening on port "+listeningPort)
+	srv := &http.Server{
+		Addr:              listenAddr,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 
-	err := http.ListenAndServe(listeningPort, nil)
-	if err != nil {
-		level.Error(logger).Log("msg", err)
+	if err := srv.ListenAndServe(); err != nil {
+		logger.Error("server error", "err", err)
 		os.Exit(1)
 	}
-}
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	target := r.URL.Query().Get("target")
-	if target == "" {
-		http.Error(w, "'target' parameter must be specified", 400)
-		return
-	}
-
-	ignoreCertCheck := false
-	if strings.ToLower(r.URL.Query().Get("ignore-cert")) == "yes" {
-		ignoreCertCheck = true
-	}
-
-	nsInstance = strings.TrimLeft(target, "https://")
-	nsInstance = strings.TrimLeft(nsInstance, "http://")
-	nsInstance = strings.Trim(nsInstance, " /")
-
-	if *debugFlg {
-		level.Debug(logger).Log("msg", "scraping target", "target", target)
-	}
-
-	exporter, err := collector.NewExporter(target, *username, *password, ignoreCertCheck, logger, nsInstance)
-	if err != nil {
-		http.Error(w, "Error creating exporter"+err.Error(), 400)
-		level.Error(logger).Log("msg", err)
-		return
-	}
-
-	registry := prometheus.NewRegistry()
-	registry.MustRegister(exporter)
-
-	// Delegate http serving to Prometheus client library, which will call collector.Collect.
-	h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
-	h.ServeHTTP(w, r)
 }
