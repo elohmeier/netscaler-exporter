@@ -3,43 +3,13 @@ package collector
 import (
 	"context"
 
+	"github.com/elohmeier/netscaler-exporter/config"
 	"github.com/elohmeier/netscaler-exporter/netscaler"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	topologyNode = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "netscaler_topology_node",
-			Help: "Node for topology visualization (1=UP, 0=DOWN)",
-		},
-		[]string{
-			"ns_instance",
-			"id",
-			"title",
-			"node_type",
-			"state",
-		},
-	)
-
-	topologyEdge = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "netscaler_topology_edge",
-			Help: "Edge representing binding between frontend and backend",
-		},
-		[]string{
-			"ns_instance",
-			"id",
-			"source",
-			"target",
-			"weight",
-			"priority",
-		},
-	)
-)
-
-func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, nsInstance string, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
 	e.topologyNode.Reset()
 	e.topologyEdge.Reset()
 
@@ -56,7 +26,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			e.topologyNode.WithLabelValues(nsInstance, nodeID, vs.Name, "lbvserver", state).Set(value)
+			labels := e.buildLabelValues(target, nodeID, vs.Name, "lbvserver", state)
+			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
 
@@ -73,7 +44,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			e.topologyNode.WithLabelValues(nsInstance, nodeID, vs.Name, "csvserver", state).Set(value)
+			labels := e.buildLabelValues(target, nodeID, vs.Name, "csvserver", state)
+			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
 
@@ -90,7 +62,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			e.topologyNode.WithLabelValues(nsInstance, nodeID, svc.Name, "service", state).Set(value)
+			labels := e.buildLabelValues(target, nodeID, svc.Name, "service", state)
+			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
 
@@ -101,7 +74,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	} else {
 		for _, sg := range serviceGroups.ServiceGroups {
 			nodeID := "servicegroup:" + sg.Name
-			e.topologyNode.WithLabelValues(nsInstance, nodeID, sg.Name, "servicegroup", "UP").Set(1.0)
+			labels := e.buildLabelValues(target, nodeID, sg.Name, "servicegroup", "UP")
+			e.topologyNode.WithLabelValues(labels...).Set(1.0)
 		}
 	}
 
@@ -118,7 +92,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 			if weight == "" {
 				weight = "1"
 			}
-			e.topologyEdge.WithLabelValues(nsInstance, edgeID, sourceID, targetID, weight, "").Set(1)
+			labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
+			e.topologyEdge.WithLabelValues(labels...).Set(1)
 		}
 	}
 
@@ -135,7 +110,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 			if weight == "" {
 				weight = "1"
 			}
-			e.topologyEdge.WithLabelValues(nsInstance, edgeID, sourceID, targetID, weight, "").Set(1)
+			labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
+			e.topologyEdge.WithLabelValues(labels...).Set(1)
 		}
 	}
 
@@ -152,7 +128,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 			if priority == "" {
 				priority = "0"
 			}
-			e.topologyEdge.WithLabelValues(nsInstance, edgeID, sourceID, targetID, "", priority).Set(1)
+			labels := e.buildLabelValues(target, edgeID, sourceID, targetID, "", priority)
+			e.topologyEdge.WithLabelValues(labels...).Set(1)
 		}
 	}
 

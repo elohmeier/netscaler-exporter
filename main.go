@@ -24,15 +24,15 @@ var (
 
 func main() {
 	var (
-		targetsFile  string
-		targets      string
+		configFile   string
+		configInline string
 		bindPort     int
 		showVersion  bool
 		debug        bool
 	)
 
-	flag.StringVar(&targetsFile, "targets-file", "", "Path to YAML/JSON file containing target configurations")
-	flag.StringVar(&targets, "targets", "", "Inline YAML/JSON target configuration")
+	flag.StringVar(&configFile, "config", "", "Path to YAML/JSON configuration file")
+	flag.StringVar(&configInline, "config-inline", "", "Inline YAML/JSON configuration")
 	flag.IntVar(&bindPort, "bind-port", 9280, "Port to bind the exporter endpoint to")
 	flag.BoolVar(&showVersion, "version", false, "Display application version")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
@@ -56,17 +56,17 @@ func main() {
 	var cfg *config.Config
 	var err error
 
-	if targetsFile != "" && targets != "" {
-		logger.Error("cannot specify both -targets-file and -targets")
+	if configFile != "" && configInline != "" {
+		logger.Error("cannot specify both -config and -config-inline")
 		os.Exit(1)
 	}
 
-	if targetsFile != "" {
-		cfg, err = config.LoadFile(targetsFile)
-	} else if targets != "" {
-		cfg, err = config.Parse(targets)
+	if configFile != "" {
+		cfg, err = config.LoadFile(configFile)
+	} else if configInline != "" {
+		cfg, err = config.Parse(configInline)
 	} else {
-		logger.Error("must specify either -targets-file or -targets")
+		logger.Error("must specify either -config or -config-inline")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -76,10 +76,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Get credentials from environment
+	username, password, err := config.GetCredentials()
+	if err != nil {
+		logger.Error("failed to get credentials", "err", err)
+		os.Exit(1)
+	}
+
+	ignoreCert := config.GetIgnoreCert()
+	if ignoreCert {
+		logger.Info("TLS certificate verification disabled")
+	}
+
 	logger.Info("loaded configuration", "targets", len(cfg.Targets))
 
 	// Create exporter with all targets
-	exporter, err := collector.NewExporter(cfg.Targets, logger)
+	exporter, err := collector.NewExporter(cfg, username, password, ignoreCert, logger)
 	if err != nil {
 		logger.Error("failed to create exporter", "err", err)
 		os.Exit(1)
