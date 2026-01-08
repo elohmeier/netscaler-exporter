@@ -141,3 +141,43 @@ func GetCSVServerLBVServerBindings(ctx context.Context, c *NitroClient, csvserve
 
 	return response.CSVServerLBVServerBindings, nil
 }
+
+// GetProtocolHTTPStats queries the Nitro API for protocol HTTP stats
+func GetProtocolHTTPStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "protocolhttp", querystring)
+}
+
+// GetProtocolTCPStats queries the Nitro API for protocol TCP stats
+func GetProtocolTCPStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "protocoltcp", querystring)
+}
+
+// GetProtocolIPStats queries the Nitro API for protocol IP stats
+func GetProtocolIPStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "protocolip", querystring)
+}
+
+// GetSSLStats queries the Nitro API for SSL stats
+func GetSSLStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "ssl", querystring)
+}
+
+// GetSSLCertKeys queries the Nitro API for SSL certificate keys
+func GetSSLCertKeys(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getConfig(ctx, c, "sslcertkey", querystring)
+}
+
+// GetSSLVServerStats queries the Nitro API for SSL virtual server stats
+func GetSSLVServerStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "sslvserver", querystring)
+}
+
+// GetSystemCPUStats queries the Nitro API for system CPU stats
+func GetSystemCPUStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "systemcpu", querystring)
+}
+
+// GetNSCapacityStats queries the Nitro API for bandwidth capacity stats
+func GetNSCapacityStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "nscapacity", querystring)
+}

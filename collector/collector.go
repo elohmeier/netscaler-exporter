@@ -415,5 +415,50 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 		e.collectTopologyMetrics(ctx, nsClient, target, ch)
 	})
 
+	// 13. Protocol HTTP Stats
+	run("protocol_http", func() {
+		e.collectProtocolHTTPStats(ctx, nsClient, target, ch)
+	})
+
+	// 14. Protocol TCP Stats
+	run("protocol_tcp", func() {
+		e.collectProtocolTCPStats(ctx, nsClient, target, ch)
+	})
+
+	// 15. Protocol IP Stats
+	run("protocol_ip", func() {
+		e.collectProtocolIPStats(ctx, nsClient, target, ch)
+	})
+
+	// 16. SSL Stats
+	run("ssl_stats", func() {
+		e.collectSSLStats(ctx, nsClient, target, ch)
+	})
+
+	// 17. SSL Cert Keys
+	run("ssl_certs", func() {
+		e.collectSSLCertKeys(ctx, nsClient, target, ch)
+	})
+
+	// 18. SSL VServer Stats
+	run("ssl_vservers", func() {
+		e.collectSSLVServerStats(ctx, nsClient, target, ch)
+	})
+
+	// 19. System CPU per-core Stats
+	run("system_cpu", func() {
+		e.collectSystemCPUStats(ctx, nsClient, target, ch)
+	})
+
+	// 20. Bandwidth Capacity Stats
+	run("ns_capacity", func() {
+		e.collectNSCapacityStats(ctx, nsClient, target, ch)
+	})
+
 	wg.Wait()
+
+	// Set probe success to 1 (we completed successfully)
+	e.probeSuccess.Reset()
+	e.probeSuccess.WithLabelValues(baseLabels...).Set(1)
+	e.probeSuccess.Collect(ch)
 }
