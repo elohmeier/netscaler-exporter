@@ -14,6 +14,7 @@ type Exporter struct {
 	username    string
 	password    string
 	ignoreCert  bool
+	caFile      string
 	parallelism int
 	labelKeys   []string
 	logger      *slog.Logger
@@ -318,7 +319,7 @@ type Exporter struct {
 }
 
 // NewExporter initialises the exporter with the given configuration
-func NewExporter(cfg *config.Config, username, password string, ignoreCert bool, parallelism int, logger *slog.Logger) (*Exporter, error) {
+func NewExporter(cfg *config.Config, username, password string, ignoreCert bool, caFile string, parallelism int, logger *slog.Logger) (*Exporter, error) {
 	labelKeys := cfg.LabelKeys()
 
 	// Build base label names for different metric types
@@ -339,6 +340,7 @@ func NewExporter(cfg *config.Config, username, password string, ignoreCert bool,
 		username:    username,
 		password:    password,
 		ignoreCert:  ignoreCert,
+		caFile:      caFile,
 		parallelism: parallelism,
 		labelKeys:   labelKeys,
 		logger:      logger,

@@ -34,7 +34,11 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	nsClient := netscaler.NewNitroClient(target.URL, e.username, e.password, e.ignoreCert)
+	nsClient, err := netscaler.NewNitroClient(target.URL, e.username, e.password, e.ignoreCert, e.caFile)
+	if err != nil {
+		e.logger.Error("failed to create Nitro client", "target", target.URL, "err", err)
+		return
+	}
 	defer nsClient.CloseIdleConnections()
 
 	var wg sync.WaitGroup

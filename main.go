@@ -90,10 +90,15 @@ func main() {
 		logger.Info("TLS certificate verification disabled")
 	}
 
+	caFile := config.GetCAFile()
+	if caFile != "" {
+		logger.Info("using custom CA file", "path", caFile)
+	}
+
 	logger.Info("loaded configuration", "targets", len(cfg.Targets))
 
 	// Create exporter with all targets
-	exporter, err := collector.NewExporter(cfg, username, password, ignoreCert, parallelism, logger)
+	exporter, err := collector.NewExporter(cfg, username, password, ignoreCert, caFile, parallelism, logger)
 	if err != nil {
 		logger.Error("failed to create exporter", "err", err)
 		os.Exit(1)

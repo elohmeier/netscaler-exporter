@@ -3,9 +3,11 @@ package netscaler
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -20,7 +22,9 @@ type NitroClient struct {
 
 // NewNitroClient creates a new client used to interact with the Nitro API.
 // Uses stateless Basic Auth for each request.
-func NewNitroClient(url string, username string, password string, ignoreCert bool) *NitroClient {
+// If caFile is provided, it will be used for TLS verification.
+// If ignoreCert is true, TLS verification is skipped entirely.
+func NewNitroClient(url string, username string, password string, ignoreCert bool, caFile string) (*NitroClient, error) {
 	transport := &http.Transport{
 		MaxIdleConns:        20,
 		MaxIdleConnsPerHost: 20,
@@ -30,6 +34,18 @@ func NewNitroClient(url string, username string, password string, ignoreCert boo
 	if ignoreCert {
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
+		}
+	} else if caFile != "" {
+		caCert, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA file: %w", err)
+		}
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate")
+		}
+		transport.TLSClientConfig = &tls.Config{
+			RootCAs: caCertPool,
 		}
 	}
 
@@ -41,7 +57,7 @@ func NewNitroClient(url string, username string, password string, ignoreCert boo
 			Timeout:   30 * time.Second,
 			Transport: transport,
 		},
-	}
+	}, nil
 }
 
 // CloseIdleConnections closes idle connections in the transport pool.

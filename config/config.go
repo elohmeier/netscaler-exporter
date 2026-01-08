@@ -70,6 +70,11 @@ func GetIgnoreCert() bool {
 	return val == "true" || val == "1"
 }
 
+// GetCAFile reads the CA file path from environment variable.
+func GetCAFile() string {
+	return os.Getenv("NETSCALER_CA_FILE")
+}
+
 // MergedLabels returns the target's labels merged with global labels.
 // Target labels override global labels with the same key.
 func (t *Target) MergedLabels(global map[string]string) map[string]string {
