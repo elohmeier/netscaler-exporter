@@ -38,8 +38,8 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	defer nsClient.CloseIdleConnections()
 
 	var wg sync.WaitGroup
-	// Semaphore to limit concurrent requests to 5 to avoid overloading the NetScaler
-	sem := make(chan struct{}, 5)
+	// Semaphore to limit concurrent requests to avoid overloading the NetScaler
+	sem := make(chan struct{}, e.parallelism)
 
 	// Helper to run a scrape function concurrently
 	run := func(name string, scrapeFn func()) {

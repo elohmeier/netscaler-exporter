@@ -27,6 +27,7 @@ func main() {
 		configFile   string
 		configInline string
 		bindPort     int
+		parallelism  int
 		showVersion  bool
 		debug        bool
 	)
@@ -34,6 +35,7 @@ func main() {
 	flag.StringVar(&configFile, "config", "", "Path to YAML/JSON configuration file")
 	flag.StringVar(&configInline, "config-inline", "", "Inline YAML/JSON configuration")
 	flag.IntVar(&bindPort, "bind-port", 9280, "Port to bind the exporter endpoint to")
+	flag.IntVar(&parallelism, "parallelism", 5, "Maximum concurrent API requests per target")
 	flag.BoolVar(&showVersion, "version", false, "Display application version")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
 	flag.Parse()
@@ -91,7 +93,7 @@ func main() {
 	logger.Info("loaded configuration", "targets", len(cfg.Targets))
 
 	// Create exporter with all targets
-	exporter, err := collector.NewExporter(cfg, username, password, ignoreCert, logger)
+	exporter, err := collector.NewExporter(cfg, username, password, ignoreCert, parallelism, logger)
 	if err != nil {
 		logger.Error("failed to create exporter", "err", err)
 		os.Exit(1)

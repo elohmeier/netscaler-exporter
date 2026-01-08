@@ -10,12 +10,13 @@ import (
 
 // Exporter represents the metrics exported to Prometheus
 type Exporter struct {
-	config     *config.Config
-	username   string
-	password   string
-	ignoreCert bool
-	labelKeys  []string
-	logger     *slog.Logger
+	config      *config.Config
+	username    string
+	password    string
+	ignoreCert  bool
+	parallelism int
+	labelKeys   []string
+	logger      *slog.Logger
 
 	// System metrics (descriptors)
 	modelID                                *prometheus.Desc
@@ -317,7 +318,7 @@ type Exporter struct {
 }
 
 // NewExporter initialises the exporter with the given configuration
-func NewExporter(cfg *config.Config, username, password string, ignoreCert bool, logger *slog.Logger) (*Exporter, error) {
+func NewExporter(cfg *config.Config, username, password string, ignoreCert bool, parallelism int, logger *slog.Logger) (*Exporter, error) {
 	labelKeys := cfg.LabelKeys()
 
 	// Build base label names for different metric types
@@ -334,12 +335,13 @@ func NewExporter(cfg *config.Config, username, password string, ignoreCert bool,
 	cpuCoreLabels := append(baseLabels, "core_id")
 
 	e := &Exporter{
-		config:     cfg,
-		username:   username,
-		password:   password,
-		ignoreCert: ignoreCert,
-		labelKeys:  labelKeys,
-		logger:     logger,
+		config:      cfg,
+		username:    username,
+		password:    password,
+		ignoreCert:  ignoreCert,
+		parallelism: parallelism,
+		labelKeys:   labelKeys,
+		logger:      logger,
 
 		// System metrics (descriptors)
 		modelID:             prometheus.NewDesc("model_id", "NetScaler model - reflects the bandwidth available", baseLabels, nil),
