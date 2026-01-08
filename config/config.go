@@ -10,8 +10,9 @@ import (
 
 // Config holds the full exporter configuration.
 type Config struct {
-	Labels  map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Targets []Target          `yaml:"targets" json:"targets"`
+	Labels     map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
+	ADCTargets []Target          `yaml:"adc_targets" json:"adc_targets"`
+	MPSTargets []Target          `yaml:"mps_targets,omitempty" json:"mps_targets,omitempty"`
 }
 
 // Target represents a single NetScaler instance to scrape.
@@ -36,13 +37,19 @@ func Parse(data string) (*Config, error) {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 
-	if len(cfg.Targets) == 0 {
-		return nil, fmt.Errorf("no targets configured")
+	if len(cfg.ADCTargets) == 0 && len(cfg.MPSTargets) == 0 {
+		return nil, fmt.Errorf("no targets configured (need adc_targets or mps_targets)")
 	}
 
-	for i, t := range cfg.Targets {
+	for i, t := range cfg.ADCTargets {
 		if t.URL == "" {
-			return nil, fmt.Errorf("target %d: url is required", i)
+			return nil, fmt.Errorf("adc_targets[%d]: url is required", i)
+		}
+	}
+
+	for i, t := range cfg.MPSTargets {
+		if t.URL == "" {
+			return nil, fmt.Errorf("mps_targets[%d]: url is required", i)
 		}
 	}
 
@@ -88,18 +95,35 @@ func (t *Target) MergedLabels(global map[string]string) map[string]string {
 	return result
 }
 
-// LabelKeys returns the sorted list of all label keys from global and all targets.
-func (c *Config) LabelKeys() []string {
+// ADCLabelKeys returns the sorted list of all label keys from global and ADC targets.
+func (c *Config) ADCLabelKeys() []string {
 	keys := make(map[string]struct{})
 	for k := range c.Labels {
 		keys[k] = struct{}{}
 	}
-	for _, t := range c.Targets {
+	for _, t := range c.ADCTargets {
 		for k := range t.Labels {
 			keys[k] = struct{}{}
 		}
 	}
+	return sortedKeys(keys)
+}
 
+// MPSLabelKeys returns the sorted list of all label keys from global and MPS targets.
+func (c *Config) MPSLabelKeys() []string {
+	keys := make(map[string]struct{})
+	for k := range c.Labels {
+		keys[k] = struct{}{}
+	}
+	for _, t := range c.MPSTargets {
+		for k := range t.Labels {
+			keys[k] = struct{}{}
+		}
+	}
+	return sortedKeys(keys)
+}
+
+func sortedKeys(keys map[string]struct{}) []string {
 	result := make([]string, 0, len(keys))
 	for k := range keys {
 		result = append(result, k)

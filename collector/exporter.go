@@ -16,7 +16,8 @@ type Exporter struct {
 	ignoreCert  bool
 	caFile      string
 	parallelism int
-	labelKeys   []string
+	adcLabelKeys []string
+	mpsLabelKeys []string
 	logger      *slog.Logger
 
 	// System metrics (descriptors)
@@ -313,14 +314,29 @@ type Exporter struct {
 	capacityMinBandwidth    *prometheus.Desc
 	capacityActualBandwidth *prometheus.Desc
 	capacityBandwidth       *prometheus.Desc
+
+	// MPS Health metrics
+	mpsHealthCPUUsage      *prometheus.GaugeVec
+	mpsHealthDiskUsage     *prometheus.GaugeVec
+	mpsHealthDiskFree      *prometheus.GaugeVec
+	mpsHealthDiskTotal     *prometheus.GaugeVec
+	mpsHealthDiskUsed      *prometheus.GaugeVec
+	mpsHealthMemoryUsage   *prometheus.GaugeVec
+	mpsHealthMemoryFree    *prometheus.GaugeVec
+	mpsHealthMemoryTotal   *prometheus.GaugeVec
 }
 
 // NewExporter initialises the exporter with the given configuration
 func NewExporter(cfg *config.Config, username, password string, ignoreCert bool, caFile string, parallelism int, logger *slog.Logger) (*Exporter, error) {
-	labelKeys := cfg.LabelKeys()
+	adcLabelKeys := cfg.ADCLabelKeys()
+	mpsLabelKeys := cfg.MPSLabelKeys()
 
-	// Build base label names for different metric types
-	baseLabels := append([]string{"ns_instance"}, labelKeys...)
+	// Build base label names for different metric types (ADC)
+	baseLabels := append([]string{"ns_instance"}, adcLabelKeys...)
+
+	// Build base label names for MPS metrics
+	mpsBaseLabels := append([]string{"mps_instance"}, mpsLabelKeys...)
+	mpsHealthLabels := append(mpsBaseLabels, "node_type")
 	vsLabels := append(baseLabels, "virtual_server")
 	svcLabels := append(baseLabels, "service")
 	sgLabels := append(baseLabels, "servicegroup", "member", "port")
@@ -333,14 +349,15 @@ func NewExporter(cfg *config.Config, username, password string, ignoreCert bool,
 	cpuCoreLabels := append(baseLabels, "core_id")
 
 	e := &Exporter{
-		config:      cfg,
-		username:    username,
-		password:    password,
-		ignoreCert:  ignoreCert,
-		caFile:      caFile,
-		parallelism: parallelism,
-		labelKeys:   labelKeys,
-		logger:      logger,
+		config:       cfg,
+		username:     username,
+		password:     password,
+		ignoreCert:   ignoreCert,
+		caFile:       caFile,
+		parallelism:  parallelism,
+		adcLabelKeys: adcLabelKeys,
+		mpsLabelKeys: mpsLabelKeys,
+		logger:       logger,
 
 		// System metrics (descriptors)
 		modelID:             prometheus.NewDesc("model_id", "NetScaler model - reflects the bandwidth available", baseLabels, nil),
@@ -636,17 +653,39 @@ func NewExporter(cfg *config.Config, username, password string, ignoreCert bool,
 		capacityMinBandwidth:    prometheus.NewDesc("netscaler_capacity_min_bandwidth", "Minimum licensed bandwidth in Mbps", baseLabels, nil),
 		capacityActualBandwidth: prometheus.NewDesc("netscaler_capacity_actual_bandwidth", "Actual bandwidth in Mbps", baseLabels, nil),
 		capacityBandwidth:       prometheus.NewDesc("netscaler_capacity_allocated_bandwidth", "Allocated licensed bandwidth in Mbps", baseLabels, nil),
+
+		// MPS Health metrics
+		mpsHealthCPUUsage:    prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_cpu_usage", Help: "MPS CPU usage percentage"}, mpsHealthLabels),
+		mpsHealthDiskUsage:   prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_disk_usage", Help: "MPS disk usage percentage"}, mpsHealthLabels),
+		mpsHealthDiskFree:    prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_disk_free_bytes", Help: "MPS disk free space in bytes"}, mpsHealthLabels),
+		mpsHealthDiskTotal:   prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_disk_total_bytes", Help: "MPS disk total space in bytes"}, mpsHealthLabels),
+		mpsHealthDiskUsed:    prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_disk_used_bytes", Help: "MPS disk used space in bytes"}, mpsHealthLabels),
+		mpsHealthMemoryUsage: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_memory_usage", Help: "MPS memory usage percentage"}, mpsHealthLabels),
+		mpsHealthMemoryFree:  prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_memory_free_bytes", Help: "MPS memory free in bytes"}, mpsHealthLabels),
+		mpsHealthMemoryTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_memory_total_bytes", Help: "MPS memory total in bytes"}, mpsHealthLabels),
 	}
 
 	return e, nil
 }
 
-// buildLabelValues creates the label values slice for a target
+// buildLabelValues creates the label values slice for an ADC target
 func (e *Exporter) buildLabelValues(target config.Target, extraLabels ...string) []string {
 	labels := target.MergedLabels(e.config.Labels)
-	values := make([]string, 0, 1+len(e.labelKeys)+len(extraLabels))
+	values := make([]string, 0, 1+len(e.adcLabelKeys)+len(extraLabels))
 	values = append(values, target.URL)
-	for _, k := range e.labelKeys {
+	for _, k := range e.adcLabelKeys {
+		values = append(values, labels[k])
+	}
+	values = append(values, extraLabels...)
+	return values
+}
+
+// buildMPSLabelValues creates the label values slice for an MPS target
+func (e *Exporter) buildMPSLabelValues(target config.Target, extraLabels ...string) []string {
+	labels := target.MergedLabels(e.config.Labels)
+	values := make([]string, 0, 1+len(e.mpsLabelKeys)+len(extraLabels))
+	values = append(values, target.URL)
+	for _, k := range e.mpsLabelKeys {
 		values = append(values, labels[k])
 	}
 	values = append(values, extraLabels...)
@@ -938,4 +977,14 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.capacityMinBandwidth
 	ch <- e.capacityActualBandwidth
 	ch <- e.capacityBandwidth
+
+	// MPS Health metrics
+	e.mpsHealthCPUUsage.Describe(ch)
+	e.mpsHealthDiskUsage.Describe(ch)
+	e.mpsHealthDiskFree.Describe(ch)
+	e.mpsHealthDiskTotal.Describe(ch)
+	e.mpsHealthDiskUsed.Describe(ch)
+	e.mpsHealthMemoryUsage.Describe(ch)
+	e.mpsHealthMemoryFree.Describe(ch)
+	e.mpsHealthMemoryTotal.Describe(ch)
 }

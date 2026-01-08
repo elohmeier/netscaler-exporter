@@ -17,20 +17,29 @@ import (
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	var wg sync.WaitGroup
 
-	// Scrape all targets concurrently
-	for _, target := range e.config.Targets {
+	// Scrape all ADC targets concurrently
+	for _, target := range e.config.ADCTargets {
 		wg.Add(1)
 		go func(t config.Target) {
 			defer wg.Done()
-			e.scrapeTarget(t, ch)
+			e.scrapeADCTarget(t, ch)
+		}(target)
+	}
+
+	// Scrape all MPS targets concurrently
+	for _, target := range e.config.MPSTargets {
+		wg.Add(1)
+		go func(t config.Target) {
+			defer wg.Done()
+			e.scrapeMPSTarget(t, ch)
 		}(target)
 	}
 
 	wg.Wait()
 }
 
-// scrapeTarget scrapes a single NetScaler target
-func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metric) {
+// scrapeADCTarget scrapes a single NetScaler ADC target
+func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -460,4 +469,34 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	})
 
 	wg.Wait()
+}
+
+// scrapeMPSTarget scrapes a single Citrix ADM (MPS) target
+func (e *Exporter) scrapeMPSTarget(target config.Target, ch chan<- prometheus.Metric) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	mpsClient, err := netscaler.NewMPSClient(target.URL, e.username, e.password, e.ignoreCert, e.caFile)
+	if err != nil {
+		e.logger.Error("failed to create MPS client", "target", target.URL, "err", err)
+		return
+	}
+	defer mpsClient.CloseIdleConnections()
+
+	// MPS Health stats
+	mpsHealth, err := netscaler.GetMPSHealth(ctx, mpsClient)
+	if err != nil {
+		e.logger.Error("failed to get MPS health stats", "target", target.URL, "err", err)
+		return
+	}
+
+	e.collectMPSHealth(mpsHealth, target)
+	e.mpsHealthCPUUsage.Collect(ch)
+	e.mpsHealthDiskUsage.Collect(ch)
+	e.mpsHealthDiskFree.Collect(ch)
+	e.mpsHealthDiskTotal.Collect(ch)
+	e.mpsHealthDiskUsed.Collect(ch)
+	e.mpsHealthMemoryUsage.Collect(ch)
+	e.mpsHealthMemoryFree.Collect(ch)
+	e.mpsHealthMemoryTotal.Collect(ch)
 }

@@ -95,7 +95,7 @@ func main() {
 		logger.Info("using custom CA file", "path", caFile)
 	}
 
-	logger.Info("loaded configuration", "targets", len(cfg.Targets))
+	logger.Info("loaded configuration", "adc_targets", len(cfg.ADCTargets), "mps_targets", len(cfg.MPSTargets))
 
 	// Create exporter with all targets
 	exporter, err := collector.NewExporter(cfg, username, password, ignoreCert, caFile, parallelism, logger)
