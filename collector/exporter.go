@@ -154,9 +154,6 @@ type Exporter struct {
 	topologyNode *prometheus.GaugeVec
 	topologyEdge *prometheus.GaugeVec
 
-	// Probe success metric
-	probeSuccess *prometheus.GaugeVec
-
 	// Protocol HTTP metrics
 	httpTotalRequests              *prometheus.Desc
 	httpTotalResponses             *prometheus.Desc
@@ -480,9 +477,6 @@ func NewExporter(cfg *config.Config, username, password string, ignoreCert bool,
 		topologyNode: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "netscaler_topology_node", Help: "Node for topology visualization"}, topoNodeLabels),
 		topologyEdge: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "netscaler_topology_edge", Help: "Edge between frontend and backend"}, topoEdgeLabels),
 
-		// Probe success metric
-		probeSuccess: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "netscaler_probe_success", Help: "Probe success (1 = success, 0 = failure)"}, baseLabels),
-
 		// Protocol HTTP metrics
 		httpTotalRequests:              prometheus.NewDesc("netscaler_http_requests_total", "Total HTTP requests", baseLabels, nil),
 		httpTotalResponses:             prometheus.NewDesc("netscaler_http_responses_total", "Total HTTP responses", baseLabels, nil),
@@ -784,9 +778,6 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 	e.topologyNode.Describe(ch)
 	e.topologyEdge.Describe(ch)
-
-	// Probe success
-	e.probeSuccess.Describe(ch)
 
 	// Protocol HTTP metrics
 	ch <- e.httpTotalRequests

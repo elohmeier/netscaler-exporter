@@ -460,9 +460,4 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	})
 
 	wg.Wait()
-
-	// Set probe success to 1 (we completed successfully)
-	e.probeSuccess.Reset()
-	e.probeSuccess.WithLabelValues(baseLabels...).Set(1)
-	e.probeSuccess.Collect(ch)
 }
