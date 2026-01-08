@@ -419,3 +419,20 @@ type NSCapacityStats struct {
 	ActualBandwidth   string `json:"actualbandwidth"`
 	Bandwidth         string `json:"bandwidth"`
 }
+
+// Bulk binding response types for bulkbindings=yes queries (NS 11.1+)
+
+// BulkLBVServerServiceBindingResponse for lbvserver_service_binding?bulkbindings=yes response
+type BulkLBVServerServiceBindingResponse struct {
+	LBVServerServiceBindings []LBVServerServiceBinding `json:"lbvserver_service_binding,omitempty"`
+}
+
+// BulkLBVServerServiceGroupBindingResponse for lbvserver_servicegroup_binding?bulkbindings=yes response
+type BulkLBVServerServiceGroupBindingResponse struct {
+	LBVServerServiceGroupBindings []LBVServerServiceGroupBinding `json:"lbvserver_servicegroup_binding,omitempty"`
+}
+
+// BulkCSVServerLBVServerBindingResponse for csvserver_lbvserver_binding?bulkbindings=yes response
+type BulkCSVServerLBVServerBindingResponse struct {
+	CSVServerLBVServerBindings []CSVServerLBVServerBinding `json:"csvserver_lbvserver_binding,omitempty"`
+}

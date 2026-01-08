@@ -142,6 +142,54 @@ func GetCSVServerLBVServerBindings(ctx context.Context, c *NitroClient, csvserve
 	return response.CSVServerLBVServerBindings, nil
 }
 
+// Bulk binding functions using bulkbindings=yes (NS 11.1+)
+// These fetch all bindings in a single API call instead of per-vserver queries.
+
+// GetAllLBVServerServiceBindings retrieves all service bindings for all LB vservers in one call.
+func GetAllLBVServerServiceBindings(ctx context.Context, c *NitroClient) ([]LBVServerServiceBinding, error) {
+	body, err := c.GetConfig(ctx, "lbvserver_service_binding", "bulkbindings=yes")
+	if err != nil {
+		return nil, fmt.Errorf("error getting bulk lbvserver_service_binding: %w", err)
+	}
+
+	var response BulkLBVServerServiceBindingResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling bulk lbvserver_service_binding: %w", err)
+	}
+
+	return response.LBVServerServiceBindings, nil
+}
+
+// GetAllLBVServerServiceGroupBindings retrieves all service group bindings for all LB vservers in one call.
+func GetAllLBVServerServiceGroupBindings(ctx context.Context, c *NitroClient) ([]LBVServerServiceGroupBinding, error) {
+	body, err := c.GetConfig(ctx, "lbvserver_servicegroup_binding", "bulkbindings=yes")
+	if err != nil {
+		return nil, fmt.Errorf("error getting bulk lbvserver_servicegroup_binding: %w", err)
+	}
+
+	var response BulkLBVServerServiceGroupBindingResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling bulk lbvserver_servicegroup_binding: %w", err)
+	}
+
+	return response.LBVServerServiceGroupBindings, nil
+}
+
+// GetAllCSVServerLBVServerBindings retrieves all LB vserver bindings for all CS vservers in one call.
+func GetAllCSVServerLBVServerBindings(ctx context.Context, c *NitroClient) ([]CSVServerLBVServerBinding, error) {
+	body, err := c.GetConfig(ctx, "csvserver_lbvserver_binding", "bulkbindings=yes")
+	if err != nil {
+		return nil, fmt.Errorf("error getting bulk csvserver_lbvserver_binding: %w", err)
+	}
+
+	var response BulkCSVServerLBVServerBindingResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling bulk csvserver_lbvserver_binding: %w", err)
+	}
+
+	return response.CSVServerLBVServerBindings, nil
+}
+
 // GetProtocolHTTPStats queries the Nitro API for protocol HTTP stats
 func GetProtocolHTTPStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
 	return getStats(ctx, c, "protocolhttp", querystring)
