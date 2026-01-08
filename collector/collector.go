@@ -370,15 +370,15 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 					return
 				}
 
-				if len(stats.ServiceGroups) == 0 {
+				if len(stats.ServiceGroups) == 0 || len(stats.ServiceGroups[0].ServiceGroupMembers) == 0 {
 					return
 				}
 
 				for _, s := range stats.ServiceGroups[0].ServiceGroupMembers {
-					servicegroupnameParts := strings.Split(s.ServiceGroupName, "?")
-					memberName := ""
-					if len(servicegroupnameParts) > 1 {
-						memberName = servicegroupnameParts[1]
+					// Extract member name from ServiceGroupName (format: "sgname?servername" or use IP)
+					memberName := s.PrimaryIPAddress
+					if parts := strings.Split(s.ServiceGroupName, "?"); len(parts) > 1 {
+						memberName = parts[1]
 					}
 
 					e.collectServiceGroupsState(s, sgName, memberName, target)

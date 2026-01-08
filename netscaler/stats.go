@@ -56,9 +56,10 @@ func GetServiceStats(ctx context.Context, c *NitroClient, querystring string) (N
 	return getStats(ctx, c, "service", querystring)
 }
 
-// GetServiceGroupMemberStats queries the Nitro API for service group member stats
-func GetServiceGroupMemberStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
-	return getStats(ctx, c, "servicegroupmember", querystring)
+// GetServiceGroupMemberStats queries the Nitro API for service group member stats.
+// Uses the servicegroup/{name}?statbindings=yes endpoint which returns members inline.
+func GetServiceGroupMemberStats(ctx context.Context, c *NitroClient, servicegroupName string) (NSAPIResponse, error) {
+	return getStats(ctx, c, "servicegroup/"+servicegroupName, "statbindings=yes")
 }
 
 // GetGSLBServiceStats queries the Nitro API for GSLB service stats
