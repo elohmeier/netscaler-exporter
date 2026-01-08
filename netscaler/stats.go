@@ -97,9 +97,9 @@ func GetServiceGroups(ctx context.Context, c *NitroClient, querystring string) (
 	return getConfig(ctx, c, "servicegroup", querystring)
 }
 
-// GetLBVServerServiceBindings retrieves all LB virtual server to service bindings.
-func GetLBVServerServiceBindings(ctx context.Context, c *NitroClient) ([]LBVServerServiceBinding, error) {
-	body, err := c.GetConfig(ctx, "lbvserver_service_binding", "")
+// GetLBVServerServiceBindings retrieves service bindings for a specific LB virtual server.
+func GetLBVServerServiceBindings(ctx context.Context, c *NitroClient, lbvserverName string) ([]LBVServerServiceBinding, error) {
+	body, err := c.GetConfig(ctx, "lbvserver_service_binding/"+lbvserverName, "")
 	if err != nil {
 		return nil, fmt.Errorf("error getting lbvserver_service_binding: %w", err)
 	}
@@ -112,9 +112,9 @@ func GetLBVServerServiceBindings(ctx context.Context, c *NitroClient) ([]LBVServ
 	return response.LBVServerServiceBindings, nil
 }
 
-// GetLBVServerServiceGroupBindings retrieves all LB virtual server to service group bindings.
-func GetLBVServerServiceGroupBindings(ctx context.Context, c *NitroClient) ([]LBVServerServiceGroupBinding, error) {
-	body, err := c.GetConfig(ctx, "lbvserver_servicegroup_binding", "")
+// GetLBVServerServiceGroupBindings retrieves service group bindings for a specific LB virtual server.
+func GetLBVServerServiceGroupBindings(ctx context.Context, c *NitroClient, lbvserverName string) ([]LBVServerServiceGroupBinding, error) {
+	body, err := c.GetConfig(ctx, "lbvserver_servicegroup_binding/"+lbvserverName, "")
 	if err != nil {
 		return nil, fmt.Errorf("error getting lbvserver_servicegroup_binding: %w", err)
 	}
@@ -127,9 +127,9 @@ func GetLBVServerServiceGroupBindings(ctx context.Context, c *NitroClient) ([]LB
 	return response.LBVServerServiceGroupBindings, nil
 }
 
-// GetCSVServerLBVServerBindings retrieves all CS virtual server to LB virtual server bindings.
-func GetCSVServerLBVServerBindings(ctx context.Context, c *NitroClient) ([]CSVServerLBVServerBinding, error) {
-	body, err := c.GetConfig(ctx, "csvserver_lbvserver_binding", "")
+// GetCSVServerLBVServerBindings retrieves LB vserver bindings for a specific CS virtual server.
+func GetCSVServerLBVServerBindings(ctx context.Context, c *NitroClient, csvserverName string) ([]CSVServerLBVServerBinding, error) {
+	body, err := c.GetConfig(ctx, "csvserver_lbvserver_binding/"+csvserverName, "")
 	if err != nil {
 		return nil, fmt.Errorf("error getting csvserver_lbvserver_binding: %w", err)
 	}

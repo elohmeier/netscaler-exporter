@@ -79,57 +79,66 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		}
 	}
 
-	// Collect LB VServer -> Service edges
-	lbSvcBindings, err := netscaler.GetLBVServerServiceBindings(ctx, nsClient)
-	if err != nil {
-		e.logger.Debug("error getting LB vserver service bindings", "target", target.URL, "err", err)
-	} else {
-		for _, b := range lbSvcBindings {
-			edgeID := "lbvserver:" + b.Name + "->service:" + b.ServiceName
-			sourceID := "lbvserver:" + b.Name
-			targetID := "service:" + b.ServiceName
-			weight := b.Weight
-			if weight == "" {
-				weight = "1"
+	// Collect LB VServer -> Service and Service Group edges
+	if len(lbVServers.VirtualServerStats) > 0 {
+		for _, vs := range lbVServers.VirtualServerStats {
+			// Service bindings
+			lbSvcBindings, err := netscaler.GetLBVServerServiceBindings(ctx, nsClient, vs.Name)
+			if err != nil {
+				e.logger.Debug("error getting LB vserver service bindings", "lbvserver", vs.Name, "target", target.URL, "err", err)
+			} else {
+				for _, b := range lbSvcBindings {
+					edgeID := "lbvserver:" + b.Name + "->service:" + b.ServiceName
+					sourceID := "lbvserver:" + b.Name
+					targetID := "service:" + b.ServiceName
+					weight := b.Weight
+					if weight == "" {
+						weight = "1"
+					}
+					labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
+					e.topologyEdge.WithLabelValues(labels...).Set(1)
+				}
 			}
-			labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
-			e.topologyEdge.WithLabelValues(labels...).Set(1)
-		}
-	}
 
-	// Collect LB VServer -> Service Group edges
-	lbSgBindings, err := netscaler.GetLBVServerServiceGroupBindings(ctx, nsClient)
-	if err != nil {
-		e.logger.Debug("error getting LB vserver service group bindings", "target", target.URL, "err", err)
-	} else {
-		for _, b := range lbSgBindings {
-			edgeID := "lbvserver:" + b.Name + "->servicegroup:" + b.ServiceGroupName
-			sourceID := "lbvserver:" + b.Name
-			targetID := "servicegroup:" + b.ServiceGroupName
-			weight := b.Weight
-			if weight == "" {
-				weight = "1"
+			// Service group bindings
+			lbSgBindings, err := netscaler.GetLBVServerServiceGroupBindings(ctx, nsClient, vs.Name)
+			if err != nil {
+				e.logger.Debug("error getting LB vserver service group bindings", "lbvserver", vs.Name, "target", target.URL, "err", err)
+			} else {
+				for _, b := range lbSgBindings {
+					edgeID := "lbvserver:" + b.Name + "->servicegroup:" + b.ServiceGroupName
+					sourceID := "lbvserver:" + b.Name
+					targetID := "servicegroup:" + b.ServiceGroupName
+					weight := b.Weight
+					if weight == "" {
+						weight = "1"
+					}
+					labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
+					e.topologyEdge.WithLabelValues(labels...).Set(1)
+				}
 			}
-			labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
-			e.topologyEdge.WithLabelValues(labels...).Set(1)
 		}
 	}
 
 	// Collect CS VServer -> LB VServer edges
-	csLbBindings, err := netscaler.GetCSVServerLBVServerBindings(ctx, nsClient)
-	if err != nil {
-		e.logger.Debug("error getting CS vserver LB vserver bindings", "target", target.URL, "err", err)
-	} else {
-		for _, b := range csLbBindings {
-			edgeID := "csvserver:" + b.Name + "->lbvserver:" + b.LBVServer
-			sourceID := "csvserver:" + b.Name
-			targetID := "lbvserver:" + b.LBVServer
-			priority := b.Priority
-			if priority == "" {
-				priority = "0"
+	if len(csVServers.CSVirtualServerStats) > 0 {
+		for _, vs := range csVServers.CSVirtualServerStats {
+			csLbBindings, err := netscaler.GetCSVServerLBVServerBindings(ctx, nsClient, vs.Name)
+			if err != nil {
+				e.logger.Debug("error getting CS vserver LB vserver bindings", "csvserver", vs.Name, "target", target.URL, "err", err)
+			} else {
+				for _, b := range csLbBindings {
+					edgeID := "csvserver:" + b.Name + "->lbvserver:" + b.LBVServer
+					sourceID := "csvserver:" + b.Name
+					targetID := "lbvserver:" + b.LBVServer
+					priority := b.Priority
+					if priority == "" {
+						priority = "0"
+					}
+					labels := e.buildLabelValues(target, edgeID, sourceID, targetID, "", priority)
+					e.topologyEdge.WithLabelValues(labels...).Set(1)
+				}
 			}
-			labels := e.buildLabelValues(target, edgeID, sourceID, targetID, "", priority)
-			e.topologyEdge.WithLabelValues(labels...).Set(1)
 		}
 	}
 
