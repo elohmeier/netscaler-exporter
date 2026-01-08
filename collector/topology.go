@@ -16,7 +16,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect LB Virtual Server nodes
 	lbVServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("error getting LB vserver stats for topology", "err", err)
+		e.logger.Error("error getting LB vserver stats for topology", "target", target.URL, "err", err)
 	} else {
 		for _, vs := range lbVServers.VirtualServerStats {
 			nodeID := "lbvserver:" + vs.Name
@@ -34,7 +34,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect CS Virtual Server nodes
 	csVServers, err := netscaler.GetCSVirtualServerStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("error getting CS vserver stats for topology", "err", err)
+		e.logger.Error("error getting CS vserver stats for topology", "target", target.URL, "err", err)
 	} else {
 		for _, vs := range csVServers.CSVirtualServerStats {
 			nodeID := "csvserver:" + vs.Name
@@ -52,7 +52,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect Service nodes
 	services, err := netscaler.GetServiceStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("error getting service stats for topology", "err", err)
+		e.logger.Error("error getting service stats for topology", "target", target.URL, "err", err)
 	} else {
 		for _, svc := range services.ServiceStats {
 			nodeID := "service:" + svc.Name
@@ -70,7 +70,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect Service Group nodes
 	serviceGroups, err := netscaler.GetServiceGroups(ctx, nsClient, "attrs=servicegroupname")
 	if err != nil {
-		e.logger.Error("error getting service groups for topology", "err", err)
+		e.logger.Error("error getting service groups for topology", "target", target.URL, "err", err)
 	} else {
 		for _, sg := range serviceGroups.ServiceGroups {
 			nodeID := "servicegroup:" + sg.Name
@@ -82,7 +82,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect LB VServer -> Service edges
 	lbSvcBindings, err := netscaler.GetLBVServerServiceBindings(ctx, nsClient)
 	if err != nil {
-		e.logger.Debug("error getting LB vserver service bindings", "err", err)
+		e.logger.Debug("error getting LB vserver service bindings", "target", target.URL, "err", err)
 	} else {
 		for _, b := range lbSvcBindings {
 			edgeID := "lbvserver:" + b.Name + "->service:" + b.ServiceName
@@ -100,7 +100,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect LB VServer -> Service Group edges
 	lbSgBindings, err := netscaler.GetLBVServerServiceGroupBindings(ctx, nsClient)
 	if err != nil {
-		e.logger.Debug("error getting LB vserver service group bindings", "err", err)
+		e.logger.Debug("error getting LB vserver service group bindings", "target", target.URL, "err", err)
 	} else {
 		for _, b := range lbSgBindings {
 			edgeID := "lbvserver:" + b.Name + "->servicegroup:" + b.ServiceGroupName
@@ -118,7 +118,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect CS VServer -> LB VServer edges
 	csLbBindings, err := netscaler.GetCSVServerLBVServerBindings(ctx, nsClient)
 	if err != nil {
-		e.logger.Debug("error getting CS vserver LB vserver bindings", "err", err)
+		e.logger.Debug("error getting CS vserver LB vserver bindings", "target", target.URL, "err", err)
 	} else {
 		for _, b := range csLbBindings {
 			edgeID := "csvserver:" + b.Name + "->lbvserver:" + b.LBVServer

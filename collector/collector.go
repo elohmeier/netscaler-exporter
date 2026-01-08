@@ -63,7 +63,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("ns_stats", func() {
 		ns, err := netscaler.GetNSStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get NS stats", "err", err)
+			e.logger.Error("failed to get NS stats", "target", target.URL, "err", err)
 			return
 		}
 
@@ -95,7 +95,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("ns_license", func() {
 		nslicense, err := netscaler.GetNSLicense(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get NS license", "err", err)
+			e.logger.Error("failed to get NS license", "target", target.URL, "err", err)
 			return
 		}
 		fltModelID, _ := strconv.ParseFloat(nslicense.NSLicense.ModelID, 64)
@@ -106,7 +106,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("interfaces", func() {
 		interfaces, err := netscaler.GetInterfaceStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get interface stats", "err", err)
+			e.logger.Error("failed to get interface stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectInterfacesRxBytes(interfaces, target)
@@ -129,7 +129,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("virtual_servers", func() {
 		virtualServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get virtual server stats", "err", err)
+			e.logger.Error("failed to get virtual server stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectVirtualServerState(virtualServers, target)
@@ -162,7 +162,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("services", func() {
 		services, err := netscaler.GetServiceStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get service stats", "err", err)
+			e.logger.Error("failed to get service stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectServicesThroughput(services, target)
@@ -203,7 +203,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("gslb_services", func() {
 		gslbServices, err := netscaler.GetGSLBServiceStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get GSLB service stats", "err", err)
+			e.logger.Error("failed to get GSLB service stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectGSLBServicesState(gslbServices, target)
@@ -232,7 +232,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("gslb_vservers", func() {
 		gslbVirtualServers, err := netscaler.GetGSLBVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get GSLB virtual server stats", "err", err)
+			e.logger.Error("failed to get GSLB virtual server stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectGSLBVirtualServerState(gslbVirtualServers, target)
@@ -263,7 +263,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("cs_vservers", func() {
 		csVirtualServers, err := netscaler.GetCSVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get CS virtual server stats", "err", err)
+			e.logger.Error("failed to get CS virtual server stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectCSVirtualServerState(csVirtualServers, target)
@@ -308,7 +308,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("vpn_vservers", func() {
 		vpnVirtualServers, err := netscaler.GetVPNVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get VPN virtual server stats", "err", err)
+			e.logger.Error("failed to get VPN virtual server stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectVPNVirtualServerTotalRequests(vpnVirtualServers, target)
@@ -327,7 +327,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("aaa_stats", func() {
 		aaa, err := netscaler.GetAAAStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get AAA stats", "err", err)
+			e.logger.Error("failed to get AAA stats", "target", target.URL, "err", err)
 			return
 		}
 		e.collectAaaAuthSuccess(aaa, target)
@@ -348,7 +348,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 	run("service_groups", func() {
 		servicegroups, err := netscaler.GetServiceGroups(ctx, nsClient, "attrs=servicegroupname")
 		if err != nil {
-			e.logger.Error("failed to get service groups", "err", err)
+			e.logger.Error("failed to get service groups", "target", target.URL, "err", err)
 			return
 		}
 
@@ -366,7 +366,7 @@ func (e *Exporter) scrapeTarget(target config.Target, ch chan<- prometheus.Metri
 
 				stats, err2 := netscaler.GetServiceGroupMemberStats(ctx, nsClient, sgName)
 				if err2 != nil {
-					e.logger.Error("failed to get service group member stats", "err", err2)
+					e.logger.Error("failed to get service group member stats", "service_group", sgName, "target", target.URL, "err", err2)
 					return
 				}
 
