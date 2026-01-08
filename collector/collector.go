@@ -56,6 +56,9 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 
 	// Helper to run a scrape function concurrently
 	run := func(name string, scrapeFn func()) {
+		if e.config.IsModuleDisabled(name) {
+			return // Skip disabled modules
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

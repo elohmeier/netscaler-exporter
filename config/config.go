@@ -10,9 +10,20 @@ import (
 
 // Config holds the full exporter configuration.
 type Config struct {
-	Labels     map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
-	ADCTargets []Target          `yaml:"adc_targets" json:"adc_targets"`
-	MPSTargets []Target          `yaml:"mps_targets,omitempty" json:"mps_targets,omitempty"`
+	Labels          map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
+	DisabledModules []string          `yaml:"disabled_modules,omitempty" json:"disabled_modules,omitempty"`
+	ADCTargets      []Target          `yaml:"adc_targets" json:"adc_targets"`
+	MPSTargets      []Target          `yaml:"mps_targets,omitempty" json:"mps_targets,omitempty"`
+}
+
+// IsModuleDisabled returns true if the given module name is in the disabled list.
+func (c *Config) IsModuleDisabled(name string) bool {
+	for _, m := range c.DisabledModules {
+		if m == name {
+			return true
+		}
+	}
+	return false
 }
 
 // Target represents a single NetScaler instance to scrape.

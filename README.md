@@ -48,6 +48,10 @@ labels:
   environment: production
   datacenter: us-east
 
+# Disable specific collector modules (optional)
+disabled_modules:
+  - ns_capacity  # Disable if device doesn't support nscapacity API
+
 # ADC (NetScaler) targets
 adc_targets:
   - url: https://netscaler1.example.com/nitro/v1
@@ -64,6 +68,33 @@ mps_targets:
     labels:
       region: us-east
 ```
+
+### Disabling Modules
+
+Use `disabled_modules` to skip collectors that aren't supported by your devices:
+
+| Module | Description |
+|--------|-------------|
+| `ns_stats` | System stats (CPU, memory, network) |
+| `ns_license` | License/model info |
+| `ns_capacity` | Bandwidth capacity stats |
+| `interfaces` | Network interface metrics |
+| `virtual_servers` | LB virtual servers |
+| `services` | Backend services |
+| `service_groups` | Service groups |
+| `gslb_services` | GSLB services |
+| `gslb_vservers` | GSLB virtual servers |
+| `cs_vservers` | Content switching virtual servers |
+| `vpn_vservers` | VPN virtual servers |
+| `aaa_stats` | Authentication stats |
+| `topology` | Topology relationships |
+| `protocol_http` | HTTP protocol stats |
+| `protocol_tcp` | TCP protocol stats |
+| `protocol_ip` | IP protocol stats |
+| `ssl_stats` | SSL global stats |
+| `ssl_certs` | SSL certificates |
+| `ssl_vservers` | SSL virtual servers |
+| `system_cpu` | Per-core CPU stats |
 
 ### CLI Flags
 
