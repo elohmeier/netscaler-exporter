@@ -1,5 +1,30 @@
 package netscaler
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// FlexString handles JSON values that may be string or number.
+// NetScaler API returns some fields as strings and others as numbers depending on context.
+type FlexString string
+
+func (f *FlexString) UnmarshalJSON(data []byte) error {
+	// Try string first
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*f = FlexString(s)
+		return nil
+	}
+	// Try number
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err == nil {
+		*f = FlexString(n.String())
+		return nil
+	}
+	return fmt.Errorf("FlexString: cannot unmarshal %s", string(data))
+}
+
 // NSAPIResponse represents the main portion of the Nitro API response
 type NSAPIResponse struct {
 	Errorcode               int64                     `json:"errorcode"`
@@ -256,28 +281,28 @@ type ProtocolHTTPStats struct {
 	ErrLargeContent                 string `json:"httperrlargecontent"`
 	ErrLargeChunk                   string `json:"httperrlargechunk"`
 	ErrLargeCtlen                   string `json:"httperrlargectlen"`
-	// Gauges (rates)
-	RequestsRate                    string `json:"httprequestsrate"`
-	ResponsesRate                   string `json:"httpresponsesrate"`
-	PostsRate                       string `json:"httppostsrate"`
-	GetsRate                        string `json:"httpgetsrate"`
-	OthersRate                      string `json:"httpothersrate"`
-	RxRequestBytesRate              string `json:"httprxrequestbytesrate"`
-	RxResponseBytesRate             string `json:"httprxresponsebytesrate"`
-	TxRequestBytesRate              string `json:"httptxrequestbytesrate"`
-	Request10Rate                   string `json:"http10requestsrate"`
-	Request11Rate                   string `json:"http11requestsrate"`
-	Response10Rate                  string `json:"http10responsesrate"`
-	Response11Rate                  string `json:"http11responsesrate"`
-	ChunkedRequestsRate             string `json:"httpchunkedrequestsrate"`
-	ChunkedResponsesRate            string `json:"httpchunkedresponsesrate"`
-	SPDYStreamsRate                 string `json:"spdystreamsrate"`
-	SPDYv2StreamsRate               string `json:"spdyv2streamsrate"`
-	SPDYv3StreamsRate               string `json:"spdyv3streamsrate"`
-	ErrNoReuseMultipartRate         string `json:"httperrnoreusemultipartrate"`
-	ErrIncompleteRequestsRate       string `json:"httperrincompleterequestsrate"`
-	ErrIncompleteResponsesRate      string `json:"httperrincompleteresponsesrate"`
-	ErrServerBusyRate               string `json:"httperrserverbusyrate"`
+	// Gauges (rates) - use FlexString as NetScaler may return number or string
+	RequestsRate                    FlexString `json:"httprequestsrate"`
+	ResponsesRate                   FlexString `json:"httpresponsesrate"`
+	PostsRate                       FlexString `json:"httppostsrate"`
+	GetsRate                        FlexString `json:"httpgetsrate"`
+	OthersRate                      FlexString `json:"httpothersrate"`
+	RxRequestBytesRate              FlexString `json:"httprxrequestbytesrate"`
+	RxResponseBytesRate             FlexString `json:"httprxresponsebytesrate"`
+	TxRequestBytesRate              FlexString `json:"httptxrequestbytesrate"`
+	Request10Rate                   FlexString `json:"http10requestsrate"`
+	Request11Rate                   FlexString `json:"http11requestsrate"`
+	Response10Rate                  FlexString `json:"http10responsesrate"`
+	Response11Rate                  FlexString `json:"http11responsesrate"`
+	ChunkedRequestsRate             FlexString `json:"httpchunkedrequestsrate"`
+	ChunkedResponsesRate            FlexString `json:"httpchunkedresponsesrate"`
+	SPDYStreamsRate                 FlexString `json:"spdystreamsrate"`
+	SPDYv2StreamsRate               FlexString `json:"spdyv2streamsrate"`
+	SPDYv3StreamsRate               FlexString `json:"spdyv3streamsrate"`
+	ErrNoReuseMultipartRate         FlexString `json:"httperrnoreusemultipartrate"`
+	ErrIncompleteRequestsRate       FlexString `json:"httperrincompleterequestsrate"`
+	ErrIncompleteResponsesRate      FlexString `json:"httperrincompleteresponsesrate"`
+	ErrServerBusyRate               FlexString `json:"httperrserverbusyrate"`
 }
 
 // ProtocolTCPStats represents the data returned from the /stat/protocoltcp Nitro API endpoint
@@ -293,23 +318,23 @@ type ProtocolTCPStats struct {
 	TotalSynProbe            string `json:"tcptotsynprobe"`
 	TotalServerFin           string `json:"tcptotsvrfin"`
 	TotalClientFin           string `json:"tcptotcltfin"`
-	// Gauges
-	ActiveServerConn         string `json:"tcpactiveserverconn"`
-	CurClientConnEstablished string `json:"tcpcurclientconnestablished"`
-	CurServerConnEstablished string `json:"tcpcurserverconnestablished"`
-	RxPacketsRate            string `json:"tcprxpktsrate"`
-	RxBytesRate              string `json:"tcprxbytesrate"`
-	TxPacketsRate            string `json:"tcptxpktsrate"`
-	TxBytesRate              string `json:"tcptxbytesrate"`
-	ClientConnOpenedRate     string `json:"tcpclientconnopenedrate"`
-	ErrBadChecksum           string `json:"tcperrbadchecksum"`
-	ErrBadChecksumRate       string `json:"tcperrbadchecksumrate"`
-	ErrAnyPortFail           string `json:"tcperranyportfail"`
-	ErrIPPortFail            string `json:"tcperripportfail"`
-	ErrBadStateConn          string `json:"tcperrbadstateconn"`
-	ErrRstThreshold          string `json:"tcperrrstthreshold"`
-	SynRate                  string `json:"tcpsynrate"`
-	SynProbeRate             string `json:"tcpsynproberate"`
+	// Gauges - use FlexString for rate fields as NetScaler may return number or string
+	ActiveServerConn         string     `json:"tcpactiveserverconn"`
+	CurClientConnEstablished string     `json:"tcpcurclientconnestablished"`
+	CurServerConnEstablished string     `json:"tcpcurserverconnestablished"`
+	RxPacketsRate            FlexString `json:"tcprxpktsrate"`
+	RxBytesRate              FlexString `json:"tcprxbytesrate"`
+	TxPacketsRate            FlexString `json:"tcptxpktsrate"`
+	TxBytesRate              FlexString `json:"tcptxbytesrate"`
+	ClientConnOpenedRate     FlexString `json:"tcpclientconnopenedrate"`
+	ErrBadChecksum           string     `json:"tcperrbadchecksum"`
+	ErrBadChecksumRate       FlexString `json:"tcperrbadchecksumrate"`
+	ErrAnyPortFail           string     `json:"tcperranyportfail"`
+	ErrIPPortFail            string     `json:"tcperripportfail"`
+	ErrBadStateConn          string     `json:"tcperrbadstateconn"`
+	ErrRstThreshold          string     `json:"tcperrrstthreshold"`
+	SynRate                  FlexString `json:"tcpsynrate"`
+	SynProbeRate             FlexString `json:"tcpsynproberate"`
 }
 
 // ProtocolIPStats represents the data returned from the /stat/protocolip Nitro API endpoint
@@ -343,39 +368,39 @@ type ProtocolIPStats struct {
 	TotalTruncatedPackets    string `json:"iptottruncatedpackets"`
 	NonIPTotalTruncatedPkts  string `json:"noniptottruncatedpackets"`
 	TotalBadMacAddrs         string `json:"iptotbadmacaddrs"`
-	// Gauges (rates)
-	RxPacketsRate            string `json:"iprxpktsrate"`
-	RxBytesRate              string `json:"iprxbytesrate"`
-	TxPacketsRate            string `json:"iptxpktsrate"`
-	TxBytesRate              string `json:"iptxbytesrate"`
-	RxMbitsRate              string `json:"iprxmbitsrate"`
-	TxMbitsRate              string `json:"iptxmbitsrate"`
-	RoutedPacketsRate        string `json:"iproutedpktsrate"`
-	RoutedMbitsRate          string `json:"iproutedmbitsrate"`
+	// Gauges (rates) - use FlexString as NetScaler may return number or string
+	RxPacketsRate            FlexString `json:"iprxpktsrate"`
+	RxBytesRate              FlexString `json:"iprxbytesrate"`
+	TxPacketsRate            FlexString `json:"iptxpktsrate"`
+	TxBytesRate              FlexString `json:"iptxbytesrate"`
+	RxMbitsRate              FlexString `json:"iprxmbitsrate"`
+	TxMbitsRate              FlexString `json:"iptxmbitsrate"`
+	RoutedPacketsRate        FlexString `json:"iproutedpktsrate"`
+	RoutedMbitsRate          FlexString `json:"iproutedmbitsrate"`
 }
 
 // SSLStats represents the data returned from the /stat/ssl Nitro API endpoint
 type SSLStats struct {
 	// Counters
-	TotalTLSv11Sessions      string `json:"ssltottlsv11sessions"`
-	TotalSSLv2Sessions       string `json:"ssltotsslv2sessions"`
-	TotalSessions            string `json:"ssltotsessions"`
-	TotalSSLv2Handshakes     string `json:"ssltotsslv2handshakes"`
-	TotalEnc                 string `json:"ssltotenc"`
-	CryptoUtilizationStat    string `json:"sslcryptoutilizationstat"`
-	TotalNewSessions         string `json:"ssltotnewsessions"`
-	// Gauges
-	SessionsRate             string `json:"sslsessionsrate"`
-	DecRate                  string `json:"ssldecrate"`
-	EncRate                  string `json:"sslencrate"`
-	SSLv2HandshakesRate      string `json:"sslsslv2handshakesrate"`
-	NewSessionsRate          string `json:"sslnewsessionsrate"`
+	TotalTLSv11Sessions      string     `json:"ssltottlsv11sessions"`
+	TotalSSLv2Sessions       string     `json:"ssltotsslv2sessions"`
+	TotalSessions            string     `json:"ssltotsessions"`
+	TotalSSLv2Handshakes     string     `json:"ssltotsslv2handshakes"`
+	TotalEnc                 string     `json:"ssltotenc"`
+	CryptoUtilizationStat    FlexString `json:"sslcryptoutilizationstat"`
+	TotalNewSessions         string     `json:"ssltotnewsessions"`
+	// Gauges - use FlexString for rate fields as NetScaler may return number or string
+	SessionsRate             FlexString `json:"sslsessionsrate"`
+	DecRate                  FlexString `json:"ssldecrate"`
+	EncRate                  FlexString `json:"sslencrate"`
+	SSLv2HandshakesRate      FlexString `json:"sslsslv2handshakesrate"`
+	NewSessionsRate          FlexString `json:"sslnewsessionsrate"`
 }
 
 // SSLCertKey represents the data returned from the /config/sslcertkey Nitro API endpoint
 type SSLCertKey struct {
-	CertKey          string `json:"certkey"`
-	DaysToExpiration string `json:"daystoexpiration"`
+	CertKey          string     `json:"certkey"`
+	DaysToExpiration FlexString `json:"daystoexpiration"`
 }
 
 // SSLVServerStats represents the data returned from the /stat/sslvserver Nitro API endpoint
@@ -393,17 +418,17 @@ type SSLVServerStats struct {
 	TotalSessionHits         string `json:"sslctxtotsessionhits"`
 	TotalClientAuthSuccess   string `json:"ssltotclientauthsuccess"`
 	TotalClientAuthFailure   string `json:"ssltotclientauthfailure"`
-	// Gauges
-	Health                   string `json:"vslbhealth"`
-	ActiveServices           string `json:"actsvcs"`
-	ClientAuthSuccessRate    string `json:"sslclientauthsuccessrate"`
-	ClientAuthFailureRate    string `json:"sslclientauthfailurerate"`
-	EncBytesRate             string `json:"sslctxencbytesrate"`
-	DecBytesRate             string `json:"sslctxdecbytesrate"`
-	HWEncBytesRate           string `json:"sslctxhwencbytesrate"`
-	HWDecBytesRate           string `json:"sslctxhwdec_bytesrate"`
-	SessionNewRate           string `json:"sslctxsessionnewrate"`
-	SessionHitsRate          string `json:"sslctxsessionhitsrate"`
+	// Gauges - use FlexString for rate fields as NetScaler may return number or string
+	Health                   string     `json:"vslbhealth"`
+	ActiveServices           string     `json:"actsvcs"`
+	ClientAuthSuccessRate    FlexString `json:"sslclientauthsuccessrate"`
+	ClientAuthFailureRate    FlexString `json:"sslclientauthfailurerate"`
+	EncBytesRate             FlexString `json:"sslctxencbytesrate"`
+	DecBytesRate             FlexString `json:"sslctxdecbytesrate"`
+	HWEncBytesRate           FlexString `json:"sslctxhwencbytesrate"`
+	HWDecBytesRate           FlexString `json:"sslctxhwdec_bytesrate"`
+	SessionNewRate           FlexString `json:"sslctxsessionnewrate"`
+	SessionHitsRate          FlexString `json:"sslctxsessionhitsrate"`
 }
 
 // SystemCPUStats represents the data returned from the /stat/systemcpu Nitro API endpoint

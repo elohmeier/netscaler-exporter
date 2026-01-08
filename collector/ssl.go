@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/elohmeier/netscaler-exporter/config"
@@ -47,7 +48,7 @@ func (e *Exporter) collectSSLCertKeys(ctx context.Context, nsClient *netscaler.N
 
 	e.sslCertDaysToExpire.Reset()
 	for _, cert := range stats.SSLCertKeys {
-		val, _ := strconv.ParseFloat(cert.DaysToExpiration, 64)
+		val, _ := strconv.ParseFloat(fmt.Sprint(cert.DaysToExpiration), 64)
 		labels := e.buildLabelValues(target, cert.CertKey)
 		e.sslCertDaysToExpire.WithLabelValues(labels...).Set(val)
 	}
@@ -161,7 +162,7 @@ func (e *Exporter) collectNSCapacityStats(ctx context.Context, nsClient *netscal
 }
 
 // setGaugeVal is a helper to set a gauge value
-func setGaugeVal(g *prometheus.GaugeVec, labels []string, value string) {
-	val, _ := strconv.ParseFloat(value, 64)
+func setGaugeVal(g *prometheus.GaugeVec, labels []string, value any) {
+	val, _ := strconv.ParseFloat(fmt.Sprint(value), 64)
 	g.WithLabelValues(labels...).Set(val)
 }

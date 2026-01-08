@@ -38,7 +38,7 @@ func NewNitroClient(url string, username string, password string, ignoreCert boo
 		username: username,
 		password: password,
 		client: &http.Client{
-			Timeout:   10 * time.Second,
+			Timeout:   30 * time.Second,
 			Transport: transport,
 		},
 	}

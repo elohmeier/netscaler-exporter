@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/elohmeier/netscaler-exporter/config"
@@ -165,8 +166,9 @@ func (e *Exporter) collectProtocolIPStats(ctx context.Context, nsClient *netscal
 	e.sendMetric(ch, e.ipRoutedMbitsRate, ip.RoutedMbitsRate, baseLabels)
 }
 
-// sendMetric is a helper to parse and send a metric value
-func (e *Exporter) sendMetric(ch chan<- prometheus.Metric, desc *prometheus.Desc, value string, labels []string) {
-	val, _ := strconv.ParseFloat(value, 64)
+// sendMetric is a helper to parse and send a metric value.
+// Accepts string or FlexString (or any type that can be converted to string via fmt.Sprint).
+func (e *Exporter) sendMetric(ch chan<- prometheus.Metric, desc *prometheus.Desc, value any, labels []string) {
+	val, _ := strconv.ParseFloat(fmt.Sprint(value), 64)
 	ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, val, labels...)
 }
