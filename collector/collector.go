@@ -59,6 +59,12 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 	// Build base label values
 	baseLabels := e.buildLabelValues()
 
+	// Collect topology metrics FIRST (synchronously) to populate chainMembership
+	// This must complete before service_groups runs so it can use chain labels
+	if !e.config.IsModuleDisabled("topology") {
+		e.collectTopologyMetrics(ctx, nsClient, ch)
+	}
+
 	// 1. NS Stats
 	run("ns_stats", func() {
 		ns, err := netscaler.GetNSStats(ctx, nsClient, "")
@@ -365,9 +371,11 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 				}
 
 				// Create servicegroup topology node (if topology enabled)
+				var sgChain string
 				if !e.config.IsModuleDisabled("topology") {
 					nodeID := "servicegroup:" + sgName
-					nodeLabels := e.buildLabelValues(nodeID, sgName, "servicegroup", "UP")
+					sgChain = e.chainMembership[nodeID]
+					nodeLabels := e.buildLabelValues(nodeID, sgName, "servicegroup", "UP", sgChain)
 					e.topologyNode.WithLabelValues(nodeLabels...).Set(1.0)
 				}
 
@@ -423,12 +431,13 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 							state = "UP"
 							value = 1.0
 						}
-						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", state)
+						// Server inherits chain from its parent servicegroup
+						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", state, sgChain)
 						e.topologyNode.WithLabelValues(nodeLabels...).Set(value)
 
 						edgeID := fmt.Sprintf("servicegroup:%s->server:%s:%d", sgName, s.PrimaryIPAddress, s.PrimaryPort)
 						sourceID := "servicegroup:" + sgName
-						edgeLabels := e.buildLabelValues(edgeID, sourceID, serverID, "1", "")
+						edgeLabels := e.buildLabelValues(edgeID, sourceID, serverID, "1", "", sgChain)
 						e.topologyEdge.WithLabelValues(edgeLabels...).Set(1)
 					}
 				}
@@ -436,12 +445,7 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		}
 	})
 
-	// 12. Topology metrics (always collected)
-	run("topology", func() {
-		e.collectTopologyMetrics(ctx, nsClient, ch)
-	})
-
-	// 13. Protocol HTTP Stats
+	// 12. Protocol HTTP Stats
 	run("protocol_http", func() {
 		e.collectProtocolHTTPStats(ctx, nsClient, ch)
 	})

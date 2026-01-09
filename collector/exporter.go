@@ -21,6 +21,9 @@ type Exporter struct {
 	labelKeys   []string
 	logger      *slog.Logger
 
+	// Chain membership for topology filtering (nodeID → comma-separated chain names)
+	chainMembership map[string]string
+
 	// System metrics (descriptors)
 	modelID                                *prometheus.Desc
 	mgmtCPUUsage                           *prometheus.Desc
@@ -338,8 +341,8 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 	sgLabels := append(baseLabels, "servicegroup", "member", "port")
 	ifLabels := append(baseLabels, "interface", "alias")
 	vpnVsLabels := append(baseLabels, "vpn_virtual_server")
-	topoNodeLabels := append(baseLabels, "id", "title", "node_type", "state")
-	topoEdgeLabels := append(baseLabels, "id", "source", "target", "weight", "priority")
+	topoNodeLabels := append(baseLabels, "id", "title", "node_type", "state", "chain")
+	topoEdgeLabels := append(baseLabels, "id", "source", "target", "weight", "priority", "chain")
 	sslCertLabels := append(baseLabels, "certkey")
 	sslVsLabels := append(baseLabels, "vserver", "type", "ip")
 	cpuCoreLabels := append(baseLabels, "core_id")

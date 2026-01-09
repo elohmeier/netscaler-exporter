@@ -2,6 +2,8 @@ package collector
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/elohmeier/netscaler-exporter/netscaler"
@@ -69,6 +71,9 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		csBindingsByVS[b.Name] = append(csBindingsByVS[b.Name], b)
 	}
 
+	// Build chain membership map
+	e.chainMembership = e.buildChainMembership(csBindingsByVS, svcBindingsByVS, sgBindingsByVS)
+
 	// Collect LB Virtual Server nodes
 	lbVServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
 	if err != nil {
@@ -82,7 +87,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			labels := e.buildLabelValues(nodeID, vs.Name, "lbvserver", state)
+			chain := e.chainMembership[nodeID]
+			labels := e.buildLabelValues(nodeID, vs.Name, "lbvserver", state, chain)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
@@ -100,7 +106,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			labels := e.buildLabelValues(nodeID, vs.Name, "csvserver", state)
+			chain := e.chainMembership[nodeID]
+			labels := e.buildLabelValues(nodeID, vs.Name, "csvserver", state, chain)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
@@ -118,7 +125,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			labels := e.buildLabelValues(nodeID, svc.Name, "service", state)
+			chain := e.chainMembership[nodeID]
+			labels := e.buildLabelValues(nodeID, svc.Name, "service", state, chain)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
@@ -129,29 +137,30 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect LB VServer -> Service and Service Group edges using lookup maps
 	if len(lbVServers.VirtualServerStats) > 0 {
 		for _, vs := range lbVServers.VirtualServerStats {
+			sourceID := "lbvserver:" + vs.Name
+			sourceChain := e.chainMembership[sourceID]
+
 			// Service bindings from lookup map
 			for _, b := range svcBindingsByVS[vs.Name] {
 				edgeID := "lbvserver:" + b.Name + "->service:" + b.ServiceName
-				sourceID := "lbvserver:" + b.Name
 				targetID := "service:" + b.ServiceName
 				weight := b.Weight
 				if weight == "" {
 					weight = "1"
 				}
-				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "")
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "", sourceChain)
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 
 			// Service group bindings from lookup map
 			for _, b := range sgBindingsByVS[vs.Name] {
 				edgeID := "lbvserver:" + b.Name + "->servicegroup:" + b.ServiceGroupName
-				sourceID := "lbvserver:" + b.Name
 				targetID := "servicegroup:" + b.ServiceGroupName
 				weight := b.Weight
 				if weight == "" {
 					weight = "1"
 				}
-				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "")
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "", sourceChain)
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 		}
@@ -160,15 +169,17 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect CS VServer -> LB VServer edges using lookup map
 	if len(csVServers.CSVirtualServerStats) > 0 {
 		for _, vs := range csVServers.CSVirtualServerStats {
+			sourceID := "csvserver:" + vs.Name
+			sourceChain := e.chainMembership[sourceID]
+
 			for _, b := range csBindingsByVS[vs.Name] {
 				edgeID := "csvserver:" + b.Name + "->lbvserver:" + b.LBVServer
-				sourceID := "csvserver:" + b.Name
 				targetID := "lbvserver:" + b.LBVServer
 				priority := b.Priority
 				if priority == "" {
 					priority = "0"
 				}
-				labels := e.buildLabelValues(edgeID, sourceID, targetID, "", priority)
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, "", priority, sourceChain)
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 		}
@@ -176,4 +187,96 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 
 	e.topologyNode.Collect(ch)
 	e.topologyEdge.Collect(ch)
+}
+
+// buildChainMembership computes which chain(s) each node belongs to.
+// A chain is identified by its top-level frontend: csvserver name, or lbvserver name if standalone.
+// Returns map[nodeID] → comma-separated chain names (sorted alphabetically).
+func (e *Exporter) buildChainMembership(
+	csBindingsByVS map[string][]netscaler.CSVServerLBVServerBinding,
+	svcBindingsByVS map[string][]netscaler.LBVServerServiceBinding,
+	sgBindingsByVS map[string][]netscaler.LBVServerServiceGroupBinding,
+) map[string]string {
+	// nodeChains collects all chains for each node
+	nodeChains := make(map[string][]string)
+
+	// addChain adds a chain to a node, avoiding duplicates
+	addChain := func(nodeID, chain string) {
+		for _, existing := range nodeChains[nodeID] {
+			if existing == chain {
+				return
+			}
+		}
+		nodeChains[nodeID] = append(nodeChains[nodeID], chain)
+	}
+
+	// Build reverse lookup: lbvserver → csvservers that reference it
+	lbToCsMap := make(map[string][]string)
+	for csvName, bindings := range csBindingsByVS {
+		for _, b := range bindings {
+			lbToCsMap[b.LBVServer] = append(lbToCsMap[b.LBVServer], csvName)
+		}
+	}
+
+	// Process csvservers: each csvserver is its own chain
+	for csvName, bindings := range csBindingsByVS {
+		chain := csvName
+		csvNodeID := "csvserver:" + csvName
+		addChain(csvNodeID, chain)
+
+		// Traverse to lbvservers
+		for _, b := range bindings {
+			lbNodeID := "lbvserver:" + b.LBVServer
+			addChain(lbNodeID, chain)
+
+			// Traverse from lbvserver to services
+			for _, svcB := range svcBindingsByVS[b.LBVServer] {
+				svcNodeID := "service:" + svcB.ServiceName
+				addChain(svcNodeID, chain)
+			}
+
+			// Traverse from lbvserver to servicegroups
+			for _, sgB := range sgBindingsByVS[b.LBVServer] {
+				sgNodeID := "servicegroup:" + sgB.ServiceGroupName
+				addChain(sgNodeID, chain)
+			}
+		}
+	}
+
+	// Process standalone lbvservers (not behind any csvserver)
+	for lbName := range svcBindingsByVS {
+		if _, hasCsParent := lbToCsMap[lbName]; !hasCsParent {
+			chain := lbName
+			lbNodeID := "lbvserver:" + lbName
+			addChain(lbNodeID, chain)
+
+			// Traverse to services
+			for _, svcB := range svcBindingsByVS[lbName] {
+				svcNodeID := "service:" + svcB.ServiceName
+				addChain(svcNodeID, chain)
+			}
+		}
+	}
+	for lbName := range sgBindingsByVS {
+		if _, hasCsParent := lbToCsMap[lbName]; !hasCsParent {
+			chain := lbName
+			lbNodeID := "lbvserver:" + lbName
+			addChain(lbNodeID, chain)
+
+			// Traverse to servicegroups
+			for _, sgB := range sgBindingsByVS[lbName] {
+				sgNodeID := "servicegroup:" + sgB.ServiceGroupName
+				addChain(sgNodeID, chain)
+			}
+		}
+	}
+
+	// Convert to comma-separated strings (sorted for consistency)
+	result := make(map[string]string, len(nodeChains))
+	for nodeID, chains := range nodeChains {
+		sort.Strings(chains)
+		result[nodeID] = strings.Join(chains, ",")
+	}
+
+	return result
 }
