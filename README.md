@@ -21,6 +21,8 @@ Prometheus exporter for Citrix NetScaler (ADC) and Citrix ADM (MPS) metrics via 
 | `NETSCALER_TYPE` | Target type: `adc` or `mps` | No (default: `adc`) |
 | `NETSCALER_IGNORE_CERT` | Skip TLS verification (`true` or `1`) | No |
 | `NETSCALER_CA_FILE` | Path to custom CA certificate file | No |
+| `NETSCALER_LABELS` | Base labels (format: `key1=val1,key2=val2`), merged with `-labels` flag | No |
+| `NETSCALER_DISABLED_MODULES` | Base disabled modules (comma-separated), merged with `-disabled-modules` flag | No |
 
 ### Binary
 

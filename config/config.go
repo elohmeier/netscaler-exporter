@@ -69,6 +69,16 @@ func GetType() string {
 	return os.Getenv("NETSCALER_TYPE")
 }
 
+// GetLabels reads labels from environment variable.
+func GetLabels() string {
+	return os.Getenv("NETSCALER_LABELS")
+}
+
+// GetDisabledModules reads disabled modules from environment variable.
+func GetDisabledModules() string {
+	return os.Getenv("NETSCALER_DISABLED_MODULES")
+}
+
 // ParseLabels parses a comma-separated key=value string into a map.
 func ParseLabels(labelsStr string) map[string]string {
 	labels := make(map[string]string)

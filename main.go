@@ -80,9 +80,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Parse labels and disabled modules
-	labels := config.ParseLabels(labelsStr)
-	disabled := config.ParseDisabledModules(disabledModules)
+	// Parse labels: env var provides base, CLI flag extends/overrides
+	envLabels := config.ParseLabels(config.GetLabels())
+	cliLabels := config.ParseLabels(labelsStr)
+	labels := envLabels
+	for k, v := range cliLabels {
+		labels[k] = v
+	}
+
+	// Parse disabled modules: env var provides base, CLI flag extends
+	envDisabled := config.ParseDisabledModules(config.GetDisabledModules())
+	cliDisabled := config.ParseDisabledModules(disabledModules)
+	disabled := append(envDisabled, cliDisabled...)
 
 	cfg := &config.Config{
 		Labels:          labels,
