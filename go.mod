@@ -2,10 +2,7 @@ module github.com/elohmeier/netscaler-exporter
 
 go 1.25
 
-require (
-	github.com/goccy/go-yaml v1.19.1
-	github.com/prometheus/client_golang v1.19.0
-)
+require github.com/prometheus/client_golang v1.19.0
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

@@ -5,20 +5,19 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/elohmeier/netscaler-exporter/config"
 	"github.com/elohmeier/netscaler-exporter/netscaler"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // collectSSLStats collects SSL global statistics
-func (e *Exporter) collectSSLStats(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSSLStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetSSLStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get SSL stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get SSL stats", "url", e.url, "err", err)
 		return
 	}
 
-	baseLabels := e.buildLabelValues(target)
+	baseLabels := e.buildLabelValues()
 	ssl := stats.SSLStats
 
 	// Counters
@@ -39,27 +38,27 @@ func (e *Exporter) collectSSLStats(ctx context.Context, nsClient *netscaler.Nitr
 }
 
 // collectSSLCertKeys collects SSL certificate expiration metrics
-func (e *Exporter) collectSSLCertKeys(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSSLCertKeys(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetSSLCertKeys(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get SSL cert keys", "target", target.URL, "err", err)
+		e.logger.Error("failed to get SSL cert keys", "url", e.url, "err", err)
 		return
 	}
 
 	e.sslCertDaysToExpire.Reset()
 	for _, cert := range stats.SSLCertKeys {
 		val, _ := strconv.ParseFloat(fmt.Sprint(cert.DaysToExpiration), 64)
-		labels := e.buildLabelValues(target, cert.CertKey)
+		labels := e.buildLabelValues(cert.CertKey)
 		e.sslCertDaysToExpire.WithLabelValues(labels...).Set(val)
 	}
 	e.sslCertDaysToExpire.Collect(ch)
 }
 
 // collectSSLVServerStats collects SSL virtual server statistics
-func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetSSLVServerStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get SSL vserver stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get SSL vserver stats", "url", e.url, "err", err)
 		return
 	}
 
@@ -84,7 +83,7 @@ func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscal
 	e.sslVServerSessionHitsRate.Reset()
 
 	for _, vs := range stats.SSLVServerStats {
-		labels := e.buildLabelValues(target, vs.VServerName, vs.Type, vs.PrimaryIPAddress)
+		labels := e.buildLabelValues(vs.VServerName, vs.Type, vs.PrimaryIPAddress)
 
 		setGaugeVal(e.sslVServerTotalDecBytes, labels, vs.TotalDecBytes)
 		setGaugeVal(e.sslVServerTotalEncBytes, labels, vs.TotalEncBytes)
@@ -128,31 +127,31 @@ func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscal
 }
 
 // collectSystemCPUStats collects per-core CPU statistics
-func (e *Exporter) collectSystemCPUStats(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSystemCPUStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetSystemCPUStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get system CPU stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get system CPU stats", "url", e.url, "err", err)
 		return
 	}
 
 	e.cpuCoreUsage.Reset()
 	for _, cpu := range stats.SystemCPUStats {
 		val, _ := strconv.ParseFloat(cpu.PerCPUUsage, 64)
-		labels := e.buildLabelValues(target, cpu.ID)
+		labels := e.buildLabelValues(cpu.ID)
 		e.cpuCoreUsage.WithLabelValues(labels...).Set(val)
 	}
 	e.cpuCoreUsage.Collect(ch)
 }
 
 // collectNSCapacityStats collects bandwidth capacity statistics
-func (e *Exporter) collectNSCapacityStats(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectNSCapacityStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetNSCapacityStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get bandwidth capacity stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get bandwidth capacity stats", "url", e.url, "err", err)
 		return
 	}
 
-	baseLabels := e.buildLabelValues(target)
+	baseLabels := e.buildLabelValues()
 	cap := stats.NSCapacityStats
 
 	e.sendMetric(ch, e.capacityMaxBandwidth, cap.MaxBandwidth, baseLabels)

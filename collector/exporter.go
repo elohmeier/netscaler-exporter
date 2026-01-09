@@ -11,13 +11,14 @@ import (
 // Exporter represents the metrics exported to Prometheus
 type Exporter struct {
 	config      *config.Config
+	url         string
+	targetType  string // "adc" or "mps"
 	username    string
 	password    string
 	ignoreCert  bool
 	caFile      string
 	parallelism int
-	adcLabelKeys []string
-	mpsLabelKeys []string
+	labelKeys   []string
 	logger      *slog.Logger
 
 	// System metrics (descriptors)
@@ -327,16 +328,11 @@ type Exporter struct {
 }
 
 // NewExporter initialises the exporter with the given configuration
-func NewExporter(cfg *config.Config, username, password string, ignoreCert bool, caFile string, parallelism int, logger *slog.Logger) (*Exporter, error) {
-	adcLabelKeys := cfg.ADCLabelKeys()
-	mpsLabelKeys := cfg.MPSLabelKeys()
+func NewExporter(cfg *config.Config, url, targetType, username, password string, ignoreCert bool, caFile string, parallelism int, logger *slog.Logger) (*Exporter, error) {
+	labelKeys := cfg.LabelKeys()
 
-	// Build base label names for different metric types (ADC)
-	baseLabels := append([]string{"ns_instance"}, adcLabelKeys...)
-
-	// Build base label names for MPS metrics
-	mpsBaseLabels := append([]string{"mps_instance"}, mpsLabelKeys...)
-	mpsHealthLabels := append(mpsBaseLabels, "node_type")
+	// Build base label names for different metric types
+	baseLabels := labelKeys
 	vsLabels := append(baseLabels, "virtual_server")
 	svcLabels := append(baseLabels, "service")
 	sgLabels := append(baseLabels, "servicegroup", "member", "port")
@@ -348,16 +344,20 @@ func NewExporter(cfg *config.Config, username, password string, ignoreCert bool,
 	sslVsLabels := append(baseLabels, "vserver", "type", "ip")
 	cpuCoreLabels := append(baseLabels, "core_id")
 
+	// MPS-specific labels
+	mpsHealthLabels := append(baseLabels, "node_type")
+
 	e := &Exporter{
-		config:       cfg,
-		username:     username,
-		password:     password,
-		ignoreCert:   ignoreCert,
-		caFile:       caFile,
-		parallelism:  parallelism,
-		adcLabelKeys: adcLabelKeys,
-		mpsLabelKeys: mpsLabelKeys,
-		logger:       logger,
+		config:      cfg,
+		url:         url,
+		targetType:  targetType,
+		username:    username,
+		password:    password,
+		ignoreCert:  ignoreCert,
+		caFile:      caFile,
+		parallelism: parallelism,
+		labelKeys:   labelKeys,
+		logger:      logger,
 
 		// System metrics (descriptors)
 		modelID:             prometheus.NewDesc("model_id", "NetScaler model - reflects the bandwidth available", baseLabels, nil),
@@ -668,25 +668,11 @@ func NewExporter(cfg *config.Config, username, password string, ignoreCert bool,
 	return e, nil
 }
 
-// buildLabelValues creates the label values slice for an ADC target
-func (e *Exporter) buildLabelValues(target config.Target, extraLabels ...string) []string {
-	labels := target.MergedLabels(e.config.Labels)
-	values := make([]string, 0, 1+len(e.adcLabelKeys)+len(extraLabels))
-	values = append(values, target.URL)
-	for _, k := range e.adcLabelKeys {
-		values = append(values, labels[k])
-	}
-	values = append(values, extraLabels...)
-	return values
-}
-
-// buildMPSLabelValues creates the label values slice for an MPS target
-func (e *Exporter) buildMPSLabelValues(target config.Target, extraLabels ...string) []string {
-	labels := target.MergedLabels(e.config.Labels)
-	values := make([]string, 0, 1+len(e.mpsLabelKeys)+len(extraLabels))
-	values = append(values, target.URL)
-	for _, k := range e.mpsLabelKeys {
-		values = append(values, labels[k])
+// buildLabelValues creates the label values slice for metrics
+func (e *Exporter) buildLabelValues(extraLabels ...string) []string {
+	values := make([]string, 0, len(e.labelKeys)+len(extraLabels))
+	for _, k := range e.labelKeys {
+		values = append(values, e.config.Labels[k])
 	}
 	values = append(values, extraLabels...)
 	return values

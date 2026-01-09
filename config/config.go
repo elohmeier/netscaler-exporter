@@ -3,17 +3,14 @@ package config
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
-
-	"github.com/goccy/go-yaml"
 )
 
-// Config holds the full exporter configuration.
+// Config holds the exporter configuration.
 type Config struct {
-	Labels          map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
-	DisabledModules []string          `yaml:"disabled_modules,omitempty" json:"disabled_modules,omitempty"`
-	ADCTargets      []Target          `yaml:"adc_targets" json:"adc_targets"`
-	MPSTargets      []Target          `yaml:"mps_targets,omitempty" json:"mps_targets,omitempty"`
+	Labels          map[string]string
+	DisabledModules []string
 }
 
 // IsModuleDisabled returns true if the given module name is in the disabled list.
@@ -26,45 +23,14 @@ func (c *Config) IsModuleDisabled(name string) bool {
 	return false
 }
 
-// Target represents a single NetScaler instance to scrape.
-type Target struct {
-	URL    string            `yaml:"url" json:"url"`
-	Labels map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
-}
-
-// LoadFile loads configuration from a YAML or JSON file.
-func LoadFile(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading config file: %w", err)
+// LabelKeys returns the sorted list of label keys.
+func (c *Config) LabelKeys() []string {
+	keys := make([]string, 0, len(c.Labels))
+	for k := range c.Labels {
+		keys = append(keys, k)
 	}
-	return Parse(string(data))
-}
-
-// Parse parses configuration from a YAML or JSON string.
-func Parse(data string) (*Config, error) {
-	var cfg Config
-	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return nil, fmt.Errorf("parsing config: %w", err)
-	}
-
-	if len(cfg.ADCTargets) == 0 && len(cfg.MPSTargets) == 0 {
-		return nil, fmt.Errorf("no targets configured (need adc_targets or mps_targets)")
-	}
-
-	for i, t := range cfg.ADCTargets {
-		if t.URL == "" {
-			return nil, fmt.Errorf("adc_targets[%d]: url is required", i)
-		}
-	}
-
-	for i, t := range cfg.MPSTargets {
-		if t.URL == "" {
-			return nil, fmt.Errorf("mps_targets[%d]: url is required", i)
-		}
-	}
-
-	return &cfg, nil
+	sort.Strings(keys)
+	return keys
 }
 
 // GetCredentials reads credentials from environment variables.
@@ -93,61 +59,54 @@ func GetCAFile() string {
 	return os.Getenv("NETSCALER_CA_FILE")
 }
 
-// MergedLabels returns the target's labels merged with global labels.
-// Target labels override global labels with the same key.
-func (t *Target) MergedLabels(global map[string]string) map[string]string {
-	result := make(map[string]string, len(global)+len(t.Labels))
-	for k, v := range global {
-		result[k] = v
-	}
-	for k, v := range t.Labels {
-		result[k] = v
-	}
-	return result
+// GetURL reads the URL from environment variable.
+func GetURL() string {
+	return os.Getenv("NETSCALER_URL")
 }
 
-// ADCLabelKeys returns the sorted list of all label keys from global and ADC targets.
-func (c *Config) ADCLabelKeys() []string {
-	keys := make(map[string]struct{})
-	for k := range c.Labels {
-		keys[k] = struct{}{}
+// GetType reads the target type from environment variable.
+func GetType() string {
+	return os.Getenv("NETSCALER_TYPE")
+}
+
+// ParseLabels parses a comma-separated key=value string into a map.
+func ParseLabels(labelsStr string) map[string]string {
+	labels := make(map[string]string)
+	if labelsStr == "" {
+		return labels
 	}
-	for _, t := range c.ADCTargets {
-		for k := range t.Labels {
-			keys[k] = struct{}{}
+
+	pairs := strings.Split(labelsStr, ",")
+	for _, pair := range pairs {
+		pair = strings.TrimSpace(pair)
+		if pair == "" {
+			continue
 		}
-	}
-	return sortedKeys(keys)
-}
-
-// MPSLabelKeys returns the sorted list of all label keys from global and MPS targets.
-func (c *Config) MPSLabelKeys() []string {
-	keys := make(map[string]struct{})
-	for k := range c.Labels {
-		keys[k] = struct{}{}
-	}
-	for _, t := range c.MPSTargets {
-		for k := range t.Labels {
-			keys[k] = struct{}{}
-		}
-	}
-	return sortedKeys(keys)
-}
-
-func sortedKeys(keys map[string]struct{}) []string {
-	result := make([]string, 0, len(keys))
-	for k := range keys {
-		result = append(result, k)
-	}
-
-	// Sort for consistent ordering
-	for i := 0; i < len(result)-1; i++ {
-		for j := i + 1; j < len(result); j++ {
-			if result[i] > result[j] {
-				result[i], result[j] = result[j], result[i]
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			if key != "" {
+				labels[key] = value
 			}
 		}
 	}
+	return labels
+}
 
-	return result
+// ParseDisabledModules parses a comma-separated list of module names.
+func ParseDisabledModules(modulesStr string) []string {
+	if modulesStr == "" {
+		return nil
+	}
+
+	parts := strings.Split(modulesStr, ",")
+	modules := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			modules = append(modules, part)
+		}
+	}
+	return modules
 }

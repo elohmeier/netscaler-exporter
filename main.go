@@ -24,18 +24,22 @@ var (
 
 func main() {
 	var (
-		configFile   string
-		configInline string
-		bindPort     int
-		parallelism  int
-		showVersion  bool
-		debug        bool
+		url             string
+		targetType      string
+		labelsStr       string
+		disabledModules string
+		bindPort        int
+		parallelism     int
+		showVersion     bool
+		debug           bool
 	)
 
-	flag.StringVar(&configFile, "config", "", "Path to YAML/JSON configuration file")
-	flag.StringVar(&configInline, "config-inline", "", "Inline YAML/JSON configuration")
+	flag.StringVar(&url, "url", "", "NetScaler URL (e.g., https://netscaler.example.com)")
+	flag.StringVar(&targetType, "type", "", "Target type: adc or mps (default: adc)")
+	flag.StringVar(&labelsStr, "labels", "", "Custom labels in key=value format, comma-separated (e.g., env=prod,dc=us-east)")
+	flag.StringVar(&disabledModules, "disabled-modules", "", "Comma-separated list of modules to disable")
 	flag.IntVar(&bindPort, "bind-port", 9280, "Port to bind the exporter endpoint to")
-	flag.IntVar(&parallelism, "parallelism", 5, "Maximum concurrent API requests per target")
+	flag.IntVar(&parallelism, "parallelism", 5, "Maximum concurrent API requests")
 	flag.BoolVar(&showVersion, "version", false, "Display application version")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging")
 	flag.Parse()
@@ -54,28 +58,35 @@ func main() {
 		AddSource: true,
 	})).With("app", app, "version", "v"+version, "build", build)
 
-	// Load configuration
-	var cfg *config.Config
-	var err error
-
-	if configFile != "" && configInline != "" {
-		logger.Error("cannot specify both -config and -config-inline")
-		os.Exit(1)
+	// URL: CLI flag takes precedence over env var
+	if url == "" {
+		url = config.GetURL()
 	}
-
-	if configFile != "" {
-		cfg, err = config.LoadFile(configFile)
-	} else if configInline != "" {
-		cfg, err = config.Parse(configInline)
-	} else {
-		logger.Error("must specify either -config or -config-inline")
+	if url == "" {
+		logger.Error("URL is required (use -url flag or NETSCALER_URL env var)")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	if err != nil {
-		logger.Error("failed to load configuration", "err", err)
+	// Type: CLI flag takes precedence over env var, default to "adc"
+	if targetType == "" {
+		targetType = config.GetType()
+	}
+	if targetType == "" {
+		targetType = "adc"
+	}
+	if targetType != "adc" && targetType != "mps" {
+		logger.Error("invalid target type (must be 'adc' or 'mps')", "type", targetType)
 		os.Exit(1)
+	}
+
+	// Parse labels and disabled modules
+	labels := config.ParseLabels(labelsStr)
+	disabled := config.ParseDisabledModules(disabledModules)
+
+	cfg := &config.Config{
+		Labels:          labels,
+		DisabledModules: disabled,
 	}
 
 	// Get credentials from environment
@@ -95,10 +106,10 @@ func main() {
 		logger.Info("using custom CA file", "path", caFile)
 	}
 
-	logger.Info("loaded configuration", "adc_targets", len(cfg.ADCTargets), "mps_targets", len(cfg.MPSTargets))
+	logger.Info("starting exporter", "url", url, "type", targetType, "labels", len(labels), "disabled_modules", len(disabled))
 
-	// Create exporter with all targets
-	exporter, err := collector.NewExporter(cfg, username, password, ignoreCert, caFile, parallelism, logger)
+	// Create exporter
+	exporter, err := collector.NewExporter(cfg, url, targetType, username, password, ignoreCert, caFile, parallelism, logger)
 	if err != nil {
 		logger.Error("failed to create exporter", "err", err)
 		os.Exit(1)

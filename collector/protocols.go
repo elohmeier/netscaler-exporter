@@ -5,20 +5,19 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/elohmeier/netscaler-exporter/config"
 	"github.com/elohmeier/netscaler-exporter/netscaler"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // collectProtocolHTTPStats collects protocol HTTP statistics
-func (e *Exporter) collectProtocolHTTPStats(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectProtocolHTTPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetProtocolHTTPStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get protocol HTTP stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get protocol HTTP stats", "url", e.url, "err", err)
 		return
 	}
 
-	baseLabels := e.buildLabelValues(target)
+	baseLabels := e.buildLabelValues()
 	http := stats.ProtocolHTTPStats
 
 	// Counters
@@ -73,14 +72,14 @@ func (e *Exporter) collectProtocolHTTPStats(ctx context.Context, nsClient *netsc
 }
 
 // collectProtocolTCPStats collects protocol TCP statistics
-func (e *Exporter) collectProtocolTCPStats(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectProtocolTCPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetProtocolTCPStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get protocol TCP stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get protocol TCP stats", "url", e.url, "err", err)
 		return
 	}
 
-	baseLabels := e.buildLabelValues(target)
+	baseLabels := e.buildLabelValues()
 	tcp := stats.ProtocolTCPStats
 
 	// Counters
@@ -115,14 +114,14 @@ func (e *Exporter) collectProtocolTCPStats(ctx context.Context, nsClient *netsca
 }
 
 // collectProtocolIPStats collects protocol IP statistics
-func (e *Exporter) collectProtocolIPStats(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectProtocolIPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	stats, err := netscaler.GetProtocolIPStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("failed to get protocol IP stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get protocol IP stats", "url", e.url, "err", err)
 		return
 	}
 
-	baseLabels := e.buildLabelValues(target)
+	baseLabels := e.buildLabelValues()
 	ip := stats.ProtocolIPStats
 
 	// Counters

@@ -4,10 +4,10 @@ Prometheus exporter for Citrix NetScaler (ADC) and Citrix ADM (MPS) metrics via 
 
 ## Features
 
-- Multi-target support with concurrent metric collection
 - Support for both ADC (NetScaler) and MPS (Citrix ADM) targets
-- Flexible labels for target identification
+- Flexible custom labels for metric identification
 - Topology metrics for service graph visualization
+- Configurable module disabling for unsupported collectors
 
 ## Quick Start
 
@@ -15,63 +15,73 @@ Prometheus exporter for Citrix NetScaler (ADC) and Citrix ADM (MPS) metrics via 
 
 | Variable | Description | Required |
 |----------|-------------|----------|
+| `NETSCALER_URL` | NetScaler URL (e.g., `https://netscaler.example.com`) | Yes (or use `-url` flag) |
 | `NETSCALER_USERNAME` | API username | Yes |
 | `NETSCALER_PASSWORD` | API password | Yes |
+| `NETSCALER_TYPE` | Target type: `adc` or `mps` | No (default: `adc`) |
 | `NETSCALER_IGNORE_CERT` | Skip TLS verification (`true` or `1`) | No |
 | `NETSCALER_CA_FILE` | Path to custom CA certificate file | No |
 
 ### Binary
 
 ```bash
+export NETSCALER_URL=https://netscaler.example.com
 export NETSCALER_USERNAME=nsroot
 export NETSCALER_PASSWORD=secret
-./netscaler-exporter -config config.yaml
+./netscaler-exporter
+```
+
+With CLI flags:
+
+```bash
+./netscaler-exporter \
+  -url https://netscaler.example.com \
+  -type adc \
+  -labels "env=prod,dc=us-east" \
+  -disabled-modules "ns_capacity,ssl_certs"
 ```
 
 ### Docker
 
 ```bash
 docker run -p 9280:9280 \
+  -e NETSCALER_URL=https://netscaler.example.com \
   -e NETSCALER_USERNAME=nsroot \
   -e NETSCALER_PASSWORD=secret \
-  -v ./config.yaml:/config.yaml \
-  ghcr.io/elohmeier/netscaler-exporter -config /config.yaml
+  ghcr.io/elohmeier/netscaler-exporter
+```
+
+For MPS (Citrix ADM):
+
+```bash
+docker run -p 9280:9280 \
+  -e NETSCALER_URL=https://adm.example.com \
+  -e NETSCALER_USERNAME=admin \
+  -e NETSCALER_PASSWORD=secret \
+  -e NETSCALER_TYPE=mps \
+  ghcr.io/elohmeier/netscaler-exporter
 ```
 
 ## Configuration
 
-The config file contains targets and optional labels. All operational settings (credentials, TLS) are via environment variables.
+All configuration is via CLI flags and environment variables. CLI flags override environment variables.
 
-```yaml
-# Global labels (applied to all targets)
-labels:
-  environment: production
-  datacenter: us-east
+### CLI Flags
 
-# Disable specific collector modules (optional)
-disabled_modules:
-  - ns_capacity  # Disable if device doesn't support nscapacity API
-
-# ADC (NetScaler) targets
-adc_targets:
-  - url: https://netscaler1.example.com/nitro/v1
-    labels:
-      cluster: primary
-
-  - url: https://netscaler2.example.com/nitro/v1
-    labels:
-      cluster: secondary
-
-# MPS (Citrix ADM) targets (optional)
-mps_targets:
-  - url: https://adm.example.com/nitro/v1
-    labels:
-      region: us-east
-```
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-url` | NetScaler URL (overrides `NETSCALER_URL`) | |
+| `-type` | Target type: `adc` or `mps` (overrides `NETSCALER_TYPE`) | `adc` |
+| `-labels` | Custom labels (format: `key1=val1,key2=val2`) | |
+| `-disabled-modules` | Modules to disable (comma-separated) | |
+| `-bind-port` | HTTP server port | 9280 |
+| `-parallelism` | Maximum concurrent API requests | 5 |
+| `-debug` | Enable debug logging | false |
+| `-version` | Display application version | |
 
 ### Disabling Modules
 
-Use `disabled_modules` to skip collectors that aren't supported by your devices:
+Use `-disabled-modules` to skip collectors that aren't supported by your device:
 
 | Module | Description |
 |--------|-------------|
@@ -96,17 +106,6 @@ Use `disabled_modules` to skip collectors that aren't supported by your devices:
 | `ssl_vservers` | SSL virtual servers |
 | `system_cpu` | Per-core CPU stats |
 
-### CLI Flags
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `-config` | Path to YAML/JSON config file | |
-| `-config-inline` | Inline YAML/JSON configuration | |
-| `-bind-port` | HTTP server port | 9280 |
-| `-parallelism` | Maximum concurrent API requests per target | 5 |
-| `-debug` | Enable debug logging | false |
-| `-version` | Display application version | |
-
 ## Endpoints
 
 | Path | Description |
@@ -116,7 +115,7 @@ Use `disabled_modules` to skip collectors that aren't supported by your devices:
 
 ## Metrics
 
-All metrics include the `ns_instance` label (target URL) plus any custom labels defined in config.
+All metrics include any custom labels defined via `-labels`.
 
 ### ADC Metrics
 

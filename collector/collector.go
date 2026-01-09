@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elohmeier/netscaler-exporter/config"
 	"github.com/elohmeier/netscaler-exporter/netscaler"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,37 +14,21 @@ import (
 
 // Collect is initiated by the Prometheus handler and gathers the metrics
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	var wg sync.WaitGroup
-
-	// Scrape all ADC targets concurrently
-	for _, target := range e.config.ADCTargets {
-		wg.Add(1)
-		go func(t config.Target) {
-			defer wg.Done()
-			e.scrapeADCTarget(t, ch)
-		}(target)
+	if e.targetType == "mps" {
+		e.scrapeMPS(ch)
+	} else {
+		e.scrapeADC(ch)
 	}
-
-	// Scrape all MPS targets concurrently
-	for _, target := range e.config.MPSTargets {
-		wg.Add(1)
-		go func(t config.Target) {
-			defer wg.Done()
-			e.scrapeMPSTarget(t, ch)
-		}(target)
-	}
-
-	wg.Wait()
 }
 
-// scrapeADCTarget scrapes a single NetScaler ADC target
-func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Metric) {
+// scrapeADC scrapes the NetScaler ADC instance
+func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	nsClient, err := netscaler.NewNitroClient(target.URL, e.username, e.password, e.ignoreCert, e.caFile)
+	nsClient, err := netscaler.NewNitroClient(e.url, e.username, e.password, e.ignoreCert, e.caFile)
 	if err != nil {
-		e.logger.Error("failed to create Nitro client", "target", target.URL, "err", err)
+		e.logger.Error("failed to create Nitro client", "url", e.url, "err", err)
 		return
 	}
 	defer nsClient.CloseIdleConnections()
@@ -67,19 +50,19 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 				defer func() { <-sem }() // Release token
 				scrapeFn()
 			case <-ctx.Done():
-				e.logger.Warn("context cancelled, skipping scrape", "target", target.URL, "name", name)
+				e.logger.Warn("context cancelled, skipping scrape", "url", e.url, "name", name)
 			}
 		}()
 	}
 
-	// Build base label values for this target
-	baseLabels := e.buildLabelValues(target)
+	// Build base label values
+	baseLabels := e.buildLabelValues()
 
 	// 1. NS Stats
 	run("ns_stats", func() {
 		ns, err := netscaler.GetNSStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get NS stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get NS stats", "url", e.url, "err", err)
 			return
 		}
 
@@ -111,7 +94,7 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("ns_license", func() {
 		nslicense, err := netscaler.GetNSLicense(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get NS license", "target", target.URL, "err", err)
+			e.logger.Error("failed to get NS license", "url", e.url, "err", err)
 			return
 		}
 		fltModelID, _ := strconv.ParseFloat(nslicense.NSLicense.ModelID, 64)
@@ -122,22 +105,22 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("interfaces", func() {
 		interfaces, err := netscaler.GetInterfaceStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get interface stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get interface stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectInterfacesRxBytes(interfaces, target)
+		e.collectInterfacesRxBytes(interfaces)
 		e.interfacesRxBytes.Collect(ch)
-		e.collectInterfacesTxBytes(interfaces, target)
+		e.collectInterfacesTxBytes(interfaces)
 		e.interfacesTxBytes.Collect(ch)
-		e.collectInterfacesRxPackets(interfaces, target)
+		e.collectInterfacesRxPackets(interfaces)
 		e.interfacesRxPackets.Collect(ch)
-		e.collectInterfacesTxPackets(interfaces, target)
+		e.collectInterfacesTxPackets(interfaces)
 		e.interfacesTxPackets.Collect(ch)
-		e.collectInterfacesJumboPacketsRx(interfaces, target)
+		e.collectInterfacesJumboPacketsRx(interfaces)
 		e.interfacesJumboPacketsRx.Collect(ch)
-		e.collectInterfacesJumboPacketsTx(interfaces, target)
+		e.collectInterfacesJumboPacketsTx(interfaces)
 		e.interfacesJumboPacketsTx.Collect(ch)
-		e.collectInterfacesErrorPacketsRx(interfaces, target)
+		e.collectInterfacesErrorPacketsRx(interfaces)
 		e.interfacesErrorPacketsRx.Collect(ch)
 	})
 
@@ -145,32 +128,32 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("virtual_servers", func() {
 		virtualServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get virtual server stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get virtual server stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectVirtualServerState(virtualServers, target)
+		e.collectVirtualServerState(virtualServers)
 		e.virtualServersState.Collect(ch)
-		e.collectVirtualServerWaitingRequests(virtualServers, target)
+		e.collectVirtualServerWaitingRequests(virtualServers)
 		e.virtualServersWaitingRequests.Collect(ch)
-		e.collectVirtualServerHealth(virtualServers, target)
+		e.collectVirtualServerHealth(virtualServers)
 		e.virtualServersHealth.Collect(ch)
-		e.collectVirtualServerInactiveServices(virtualServers, target)
+		e.collectVirtualServerInactiveServices(virtualServers)
 		e.virtualServersInactiveServices.Collect(ch)
-		e.collectVirtualServerActiveServices(virtualServers, target)
+		e.collectVirtualServerActiveServices(virtualServers)
 		e.virtualServersActiveServices.Collect(ch)
-		e.collectVirtualServerTotalHits(virtualServers, target)
+		e.collectVirtualServerTotalHits(virtualServers)
 		e.virtualServersTotalHits.Collect(ch)
-		e.collectVirtualServerTotalRequests(virtualServers, target)
+		e.collectVirtualServerTotalRequests(virtualServers)
 		e.virtualServersTotalRequests.Collect(ch)
-		e.collectVirtualServerTotalResponses(virtualServers, target)
+		e.collectVirtualServerTotalResponses(virtualServers)
 		e.virtualServersTotalResponses.Collect(ch)
-		e.collectVirtualServerTotalRequestBytes(virtualServers, target)
+		e.collectVirtualServerTotalRequestBytes(virtualServers)
 		e.virtualServersTotalRequestBytes.Collect(ch)
-		e.collectVirtualServerTotalResponseBytes(virtualServers, target)
+		e.collectVirtualServerTotalResponseBytes(virtualServers)
 		e.virtualServersTotalResponseBytes.Collect(ch)
-		e.collectVirtualServerCurrentClientConnections(virtualServers, target)
+		e.collectVirtualServerCurrentClientConnections(virtualServers)
 		e.virtualServersCurrentClientConnections.Collect(ch)
-		e.collectVirtualServerCurrentServerConnections(virtualServers, target)
+		e.collectVirtualServerCurrentServerConnections(virtualServers)
 		e.virtualServersCurrentServerConnections.Collect(ch)
 	})
 
@@ -178,40 +161,40 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("services", func() {
 		services, err := netscaler.GetServiceStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get service stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get service stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectServicesThroughput(services, target)
+		e.collectServicesThroughput(services)
 		e.servicesThroughput.Collect(ch)
-		e.collectServicesAvgTTFB(services, target)
+		e.collectServicesAvgTTFB(services)
 		e.servicesAvgTTFB.Collect(ch)
-		e.collectServicesState(services, target)
+		e.collectServicesState(services)
 		e.servicesState.Collect(ch)
-		e.collectServicesTotalRequests(services, target)
+		e.collectServicesTotalRequests(services)
 		e.servicesTotalRequests.Collect(ch)
-		e.collectServicesTotalResponses(services, target)
+		e.collectServicesTotalResponses(services)
 		e.servicesTotalResponses.Collect(ch)
-		e.collectServicesTotalRequestBytes(services, target)
+		e.collectServicesTotalRequestBytes(services)
 		e.servicesTotalRequestBytes.Collect(ch)
-		e.collectServicesTotalResponseBytes(services, target)
+		e.collectServicesTotalResponseBytes(services)
 		e.servicesTotalResponseBytes.Collect(ch)
-		e.collectServicesCurrentClientConns(services, target)
+		e.collectServicesCurrentClientConns(services)
 		e.servicesCurrentClientConns.Collect(ch)
-		e.collectServicesSurgeCount(services, target)
+		e.collectServicesSurgeCount(services)
 		e.servicesSurgeCount.Collect(ch)
-		e.collectServicesCurrentServerConns(services, target)
+		e.collectServicesCurrentServerConns(services)
 		e.servicesCurrentServerConns.Collect(ch)
-		e.collectServicesServerEstablishedConnections(services, target)
+		e.collectServicesServerEstablishedConnections(services)
 		e.servicesServerEstablishedConnections.Collect(ch)
-		e.collectServicesCurrentReusePool(services, target)
+		e.collectServicesCurrentReusePool(services)
 		e.servicesCurrentReusePool.Collect(ch)
-		e.collectServicesMaxClients(services, target)
+		e.collectServicesMaxClients(services)
 		e.servicesMaxClients.Collect(ch)
-		e.collectServicesCurrentLoad(services, target)
+		e.collectServicesCurrentLoad(services)
 		e.servicesCurrentLoad.Collect(ch)
-		e.collectServicesVirtualServerServiceHits(services, target)
+		e.collectServicesVirtualServerServiceHits(services)
 		e.servicesVirtualServerServiceHits.Collect(ch)
-		e.collectServicesActiveTransactions(services, target)
+		e.collectServicesActiveTransactions(services)
 		e.servicesActiveTransactions.Collect(ch)
 	})
 
@@ -219,28 +202,28 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("gslb_services", func() {
 		gslbServices, err := netscaler.GetGSLBServiceStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get GSLB service stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get GSLB service stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectGSLBServicesState(gslbServices, target)
+		e.collectGSLBServicesState(gslbServices)
 		e.gslbServicesState.Collect(ch)
-		e.collectGSLBServicesTotalRequests(gslbServices, target)
+		e.collectGSLBServicesTotalRequests(gslbServices)
 		e.gslbServicesTotalRequests.Collect(ch)
-		e.collectGSLBServicesTotalResponses(gslbServices, target)
+		e.collectGSLBServicesTotalResponses(gslbServices)
 		e.gslbServicesTotalResponses.Collect(ch)
-		e.collectGSLBServicesTotalRequestBytes(gslbServices, target)
+		e.collectGSLBServicesTotalRequestBytes(gslbServices)
 		e.gslbServicesTotalRequestBytes.Collect(ch)
-		e.collectGSLBServicesTotalResponseBytes(gslbServices, target)
+		e.collectGSLBServicesTotalResponseBytes(gslbServices)
 		e.gslbServicesTotalResponseBytes.Collect(ch)
-		e.collectGSLBServicesCurrentClientConns(gslbServices, target)
+		e.collectGSLBServicesCurrentClientConns(gslbServices)
 		e.gslbServicesCurrentClientConns.Collect(ch)
-		e.collectGSLBServicesCurrentServerConns(gslbServices, target)
+		e.collectGSLBServicesCurrentServerConns(gslbServices)
 		e.gslbServicesCurrentServerConns.Collect(ch)
-		e.collectGSLBServicesEstablishedConnections(gslbServices, target)
+		e.collectGSLBServicesEstablishedConnections(gslbServices)
 		e.gslbServicesEstablishedConnections.Collect(ch)
-		e.collectGSLBServicesCurrentLoad(gslbServices, target)
+		e.collectGSLBServicesCurrentLoad(gslbServices)
 		e.gslbServicesCurrentLoad.Collect(ch)
-		e.collectGSLBServicesVirtualServerServiceHits(gslbServices, target)
+		e.collectGSLBServicesVirtualServerServiceHits(gslbServices)
 		e.gslbServicesVirtualServerServiceHits.Collect(ch)
 	})
 
@@ -248,30 +231,30 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("gslb_vservers", func() {
 		gslbVirtualServers, err := netscaler.GetGSLBVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get GSLB virtual server stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get GSLB virtual server stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectGSLBVirtualServerState(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerState(gslbVirtualServers)
 		e.gslbVirtualServersState.Collect(ch)
-		e.collectGSLBVirtualServerHealth(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerHealth(gslbVirtualServers)
 		e.gslbVirtualServersHealth.Collect(ch)
-		e.collectGSLBVirtualServerInactiveServices(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerInactiveServices(gslbVirtualServers)
 		e.gslbVirtualServersInactiveServices.Collect(ch)
-		e.collectGSLBVirtualServerActiveServices(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerActiveServices(gslbVirtualServers)
 		e.gslbVirtualServersActiveServices.Collect(ch)
-		e.collectGSLBVirtualServerTotalHits(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerTotalHits(gslbVirtualServers)
 		e.gslbVirtualServersTotalHits.Collect(ch)
-		e.collectGSLBVirtualServerTotalRequests(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerTotalRequests(gslbVirtualServers)
 		e.gslbVirtualServersTotalRequests.Collect(ch)
-		e.collectGSLBVirtualServerTotalResponses(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerTotalResponses(gslbVirtualServers)
 		e.gslbVirtualServersTotalResponses.Collect(ch)
-		e.collectGSLBVirtualServerTotalRequestBytes(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerTotalRequestBytes(gslbVirtualServers)
 		e.gslbVirtualServersTotalRequestBytes.Collect(ch)
-		e.collectGSLBVirtualServerTotalResponseBytes(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerTotalResponseBytes(gslbVirtualServers)
 		e.gslbVirtualServersTotalResponseBytes.Collect(ch)
-		e.collectGSLBVirtualServerCurrentClientConnections(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerCurrentClientConnections(gslbVirtualServers)
 		e.gslbVirtualServersCurrentClientConnections.Collect(ch)
-		e.collectGSLBVirtualServerCurrentServerConnections(gslbVirtualServers, target)
+		e.collectGSLBVirtualServerCurrentServerConnections(gslbVirtualServers)
 		e.gslbVirtualServersCurrentServerConnections.Collect(ch)
 	})
 
@@ -279,44 +262,44 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("cs_vservers", func() {
 		csVirtualServers, err := netscaler.GetCSVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get CS virtual server stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get CS virtual server stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectCSVirtualServerState(csVirtualServers, target)
+		e.collectCSVirtualServerState(csVirtualServers)
 		e.csVirtualServersState.Collect(ch)
-		e.collectCSVirtualServerTotalHits(csVirtualServers, target)
+		e.collectCSVirtualServerTotalHits(csVirtualServers)
 		e.csVirtualServersTotalHits.Collect(ch)
-		e.collectCSVirtualServerTotalRequests(csVirtualServers, target)
+		e.collectCSVirtualServerTotalRequests(csVirtualServers)
 		e.csVirtualServersTotalRequests.Collect(ch)
-		e.collectCSVirtualServerTotalResponses(csVirtualServers, target)
+		e.collectCSVirtualServerTotalResponses(csVirtualServers)
 		e.csVirtualServersTotalResponses.Collect(ch)
-		e.collectCSVirtualServerTotalRequestBytes(csVirtualServers, target)
+		e.collectCSVirtualServerTotalRequestBytes(csVirtualServers)
 		e.csVirtualServersTotalRequestBytes.Collect(ch)
-		e.collectCSVirtualServerTotalResponseBytes(csVirtualServers, target)
+		e.collectCSVirtualServerTotalResponseBytes(csVirtualServers)
 		e.csVirtualServersTotalResponseBytes.Collect(ch)
-		e.collectCSVirtualServerCurrentClientConnections(csVirtualServers, target)
+		e.collectCSVirtualServerCurrentClientConnections(csVirtualServers)
 		e.csVirtualServersCurrentClientConnections.Collect(ch)
-		e.collectCSVirtualServerCurrentServerConnections(csVirtualServers, target)
+		e.collectCSVirtualServerCurrentServerConnections(csVirtualServers)
 		e.csVirtualServersCurrentServerConnections.Collect(ch)
-		e.collectCSVirtualServerEstablishedConnections(csVirtualServers, target)
+		e.collectCSVirtualServerEstablishedConnections(csVirtualServers)
 		e.csVirtualServersEstablishedConnections.Collect(ch)
-		e.collectCSVirtualServerTotalPacketsReceived(csVirtualServers, target)
+		e.collectCSVirtualServerTotalPacketsReceived(csVirtualServers)
 		e.csVirtualServersTotalPacketsReceived.Collect(ch)
-		e.collectCSVirtualServerTotalPacketsSent(csVirtualServers, target)
+		e.collectCSVirtualServerTotalPacketsSent(csVirtualServers)
 		e.csVirtualServersTotalPacketsSent.Collect(ch)
-		e.collectCSVirtualServerTotalSpillovers(csVirtualServers, target)
+		e.collectCSVirtualServerTotalSpillovers(csVirtualServers)
 		e.csVirtualServersTotalSpillovers.Collect(ch)
-		e.collectCSVirtualServerDeferredRequests(csVirtualServers, target)
+		e.collectCSVirtualServerDeferredRequests(csVirtualServers)
 		e.csVirtualServersDeferredRequests.Collect(ch)
-		e.collectCSVirtualServerNumberInvalidRequestResponse(csVirtualServers, target)
+		e.collectCSVirtualServerNumberInvalidRequestResponse(csVirtualServers)
 		e.csVirtualServersNumberInvalidRequestResponse.Collect(ch)
-		e.collectCSVirtualServerNumberInvalidRequestResponseDropped(csVirtualServers, target)
+		e.collectCSVirtualServerNumberInvalidRequestResponseDropped(csVirtualServers)
 		e.csVirtualServersNumberInvalidRequestResponseDropped.Collect(ch)
-		e.collectCSVirtualServerTotalVServerDownBackupHits(csVirtualServers, target)
+		e.collectCSVirtualServerTotalVServerDownBackupHits(csVirtualServers)
 		e.csVirtualServersTotalVServerDownBackupHits.Collect(ch)
-		e.collectCSVirtualServerCurrentMultipathSessions(csVirtualServers, target)
+		e.collectCSVirtualServerCurrentMultipathSessions(csVirtualServers)
 		e.csVirtualServersCurrentMultipathSessions.Collect(ch)
-		e.collectCSVirtualServerCurrentMultipathSubflows(csVirtualServers, target)
+		e.collectCSVirtualServerCurrentMultipathSubflows(csVirtualServers)
 		e.csVirtualServersCurrentMultipathSubflows.Collect(ch)
 	})
 
@@ -324,18 +307,18 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("vpn_vservers", func() {
 		vpnVirtualServers, err := netscaler.GetVPNVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get VPN virtual server stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get VPN virtual server stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectVPNVirtualServerTotalRequests(vpnVirtualServers, target)
+		e.collectVPNVirtualServerTotalRequests(vpnVirtualServers)
 		e.vpnVirtualServersTotalRequests.Collect(ch)
-		e.collectVPNVirtualServerTotalResponses(vpnVirtualServers, target)
+		e.collectVPNVirtualServerTotalResponses(vpnVirtualServers)
 		e.vpnVirtualServersTotalResponses.Collect(ch)
-		e.collectVPNVirtualServerTotalRequestBytes(vpnVirtualServers, target)
+		e.collectVPNVirtualServerTotalRequestBytes(vpnVirtualServers)
 		e.vpnVirtualServersTotalRequestBytes.Collect(ch)
-		e.collectVPNVirtualServerTotalResponseBytes(vpnVirtualServers, target)
+		e.collectVPNVirtualServerTotalResponseBytes(vpnVirtualServers)
 		e.vpnVirtualServersTotalResponseBytes.Collect(ch)
-		e.collectVPNVirtualServerState(vpnVirtualServers, target)
+		e.collectVPNVirtualServerState(vpnVirtualServers)
 		e.vpnVirtualServersState.Collect(ch)
 	})
 
@@ -343,20 +326,20 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("aaa_stats", func() {
 		aaa, err := netscaler.GetAAAStats(ctx, nsClient, "")
 		if err != nil {
-			e.logger.Error("failed to get AAA stats", "target", target.URL, "err", err)
+			e.logger.Error("failed to get AAA stats", "url", e.url, "err", err)
 			return
 		}
-		e.collectAaaAuthSuccess(aaa, target)
+		e.collectAaaAuthSuccess(aaa)
 		e.aaaAuthSuccess.Collect(ch)
-		e.collectAaaAuthFail(aaa, target)
+		e.collectAaaAuthFail(aaa)
 		e.aaaAuthFail.Collect(ch)
-		e.collectAaaAuthOnlyHTTPSuccess(aaa, target)
+		e.collectAaaAuthOnlyHTTPSuccess(aaa)
 		e.aaaAuthOnlyHTTPSuccess.Collect(ch)
-		e.collectAaaAuthOnlyHTTPFail(aaa, target)
+		e.collectAaaAuthOnlyHTTPFail(aaa)
 		e.aaaAuthOnlyHTTPFail.Collect(ch)
-		e.collectAaaCurIcaSessions(aaa, target)
+		e.collectAaaCurIcaSessions(aaa)
 		e.aaaCurIcaSessions.Collect(ch)
-		e.collectAaaCurIcaOnlyConn(aaa, target)
+		e.collectAaaCurIcaOnlyConn(aaa)
 		e.aaaCurIcaOnlyConn.Collect(ch)
 	})
 
@@ -364,7 +347,7 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 	run("service_groups", func() {
 		servicegroups, err := netscaler.GetServiceGroups(ctx, nsClient, "attrs=servicegroupname")
 		if err != nil {
-			e.logger.Error("failed to get service groups", "target", target.URL, "err", err)
+			e.logger.Error("failed to get service groups", "url", e.url, "err", err)
 			return
 		}
 
@@ -382,7 +365,7 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 
 				stats, err2 := netscaler.GetServiceGroupMemberStats(ctx, nsClient, sgName)
 				if err2 != nil {
-					e.logger.Error("failed to get service group member stats", "service_group", sgName, "target", target.URL, "err", err2)
+					e.logger.Error("failed to get service group member stats", "service_group", sgName, "url", e.url, "err", err2)
 					return
 				}
 
@@ -397,29 +380,29 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 						memberName = parts[1]
 					}
 
-					e.collectServiceGroupsState(s, sgName, memberName, target)
+					e.collectServiceGroupsState(s, sgName, memberName)
 					e.serviceGroupsState.Collect(ch)
-					e.collectServiceGroupsAvgTTFB(s, sgName, memberName, target)
+					e.collectServiceGroupsAvgTTFB(s, sgName, memberName)
 					e.serviceGroupsAvgTTFB.Collect(ch)
-					e.collectServiceGroupsTotalRequests(s, sgName, memberName, target)
+					e.collectServiceGroupsTotalRequests(s, sgName, memberName)
 					e.serviceGroupsTotalRequests.Collect(ch)
-					e.collectServiceGroupsTotalResponses(s, sgName, memberName, target)
+					e.collectServiceGroupsTotalResponses(s, sgName, memberName)
 					e.serviceGroupsTotalResponses.Collect(ch)
-					e.collectServiceGroupsTotalRequestBytes(s, sgName, memberName, target)
+					e.collectServiceGroupsTotalRequestBytes(s, sgName, memberName)
 					e.serviceGroupsTotalRequestBytes.Collect(ch)
-					e.collectServiceGroupsTotalResponseBytes(s, sgName, memberName, target)
+					e.collectServiceGroupsTotalResponseBytes(s, sgName, memberName)
 					e.serviceGroupsTotalResponseBytes.Collect(ch)
-					e.collectServiceGroupsCurrentClientConnections(s, sgName, memberName, target)
+					e.collectServiceGroupsCurrentClientConnections(s, sgName, memberName)
 					e.serviceGroupsCurrentClientConnections.Collect(ch)
-					e.collectServiceGroupsSurgeCount(s, sgName, memberName, target)
+					e.collectServiceGroupsSurgeCount(s, sgName, memberName)
 					e.serviceGroupsSurgeCount.Collect(ch)
-					e.collectServiceGroupsCurrentServerConnections(s, sgName, memberName, target)
+					e.collectServiceGroupsCurrentServerConnections(s, sgName, memberName)
 					e.serviceGroupsCurrentServerConnections.Collect(ch)
-					e.collectServiceGroupsServerEstablishedConnections(s, sgName, memberName, target)
+					e.collectServiceGroupsServerEstablishedConnections(s, sgName, memberName)
 					e.serviceGroupsServerEstablishedConnections.Collect(ch)
-					e.collectServiceGroupsCurrentReusePool(s, sgName, memberName, target)
+					e.collectServiceGroupsCurrentReusePool(s, sgName, memberName)
 					e.serviceGroupsCurrentReusePool.Collect(ch)
-					e.collectServiceGroupsMaxClients(s, sgName, memberName, target)
+					e.collectServiceGroupsMaxClients(s, sgName, memberName)
 					e.serviceGroupsMaxClients.Collect(ch)
 				}
 			}()
@@ -428,60 +411,60 @@ func (e *Exporter) scrapeADCTarget(target config.Target, ch chan<- prometheus.Me
 
 	// 12. Topology metrics (always collected)
 	run("topology", func() {
-		e.collectTopologyMetrics(ctx, nsClient, target, ch)
+		e.collectTopologyMetrics(ctx, nsClient, ch)
 	})
 
 	// 13. Protocol HTTP Stats
 	run("protocol_http", func() {
-		e.collectProtocolHTTPStats(ctx, nsClient, target, ch)
+		e.collectProtocolHTTPStats(ctx, nsClient, ch)
 	})
 
 	// 14. Protocol TCP Stats
 	run("protocol_tcp", func() {
-		e.collectProtocolTCPStats(ctx, nsClient, target, ch)
+		e.collectProtocolTCPStats(ctx, nsClient, ch)
 	})
 
 	// 15. Protocol IP Stats
 	run("protocol_ip", func() {
-		e.collectProtocolIPStats(ctx, nsClient, target, ch)
+		e.collectProtocolIPStats(ctx, nsClient, ch)
 	})
 
 	// 16. SSL Stats
 	run("ssl_stats", func() {
-		e.collectSSLStats(ctx, nsClient, target, ch)
+		e.collectSSLStats(ctx, nsClient, ch)
 	})
 
 	// 17. SSL Cert Keys
 	run("ssl_certs", func() {
-		e.collectSSLCertKeys(ctx, nsClient, target, ch)
+		e.collectSSLCertKeys(ctx, nsClient, ch)
 	})
 
 	// 18. SSL VServer Stats
 	run("ssl_vservers", func() {
-		e.collectSSLVServerStats(ctx, nsClient, target, ch)
+		e.collectSSLVServerStats(ctx, nsClient, ch)
 	})
 
 	// 19. System CPU per-core Stats
 	run("system_cpu", func() {
-		e.collectSystemCPUStats(ctx, nsClient, target, ch)
+		e.collectSystemCPUStats(ctx, nsClient, ch)
 	})
 
 	// 20. Bandwidth Capacity Stats
 	run("ns_capacity", func() {
-		e.collectNSCapacityStats(ctx, nsClient, target, ch)
+		e.collectNSCapacityStats(ctx, nsClient, ch)
 	})
 
 	wg.Wait()
 }
 
-// scrapeMPSTarget scrapes a single Citrix ADM (MPS) target
-func (e *Exporter) scrapeMPSTarget(target config.Target, ch chan<- prometheus.Metric) {
+// scrapeMPS scrapes the Citrix ADM (MPS) instance
+func (e *Exporter) scrapeMPS(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	mpsClient, err := netscaler.NewMPSClient(target.URL, e.username, e.password, e.ignoreCert, e.caFile)
+	mpsClient, err := netscaler.NewMPSClient(e.url, e.username, e.password, e.ignoreCert, e.caFile)
 	if err != nil {
-		e.logger.Error("failed to create MPS client", "target", target.URL, "err", err)
+		e.logger.Error("failed to create MPS client", "url", e.url, "err", err)
 		return
 	}
 	defer mpsClient.CloseIdleConnections()
@@ -489,11 +472,11 @@ func (e *Exporter) scrapeMPSTarget(target config.Target, ch chan<- prometheus.Me
 	// MPS Health stats
 	mpsHealth, err := netscaler.GetMPSHealth(ctx, mpsClient)
 	if err != nil {
-		e.logger.Error("failed to get MPS health stats", "target", target.URL, "err", err)
+		e.logger.Error("failed to get MPS health stats", "url", e.url, "err", err)
 		return
 	}
 
-	e.collectMPSHealth(mpsHealth, target)
+	e.collectMPSHealth(mpsHealth)
 	e.mpsHealthCPUUsage.Collect(ch)
 	e.mpsHealthDiskUsage.Collect(ch)
 	e.mpsHealthDiskFree.Collect(ch)

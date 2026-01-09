@@ -4,13 +4,12 @@ import (
 	"context"
 	"sync"
 
-	"github.com/elohmeier/netscaler-exporter/config"
 	"github.com/elohmeier/netscaler-exporter/netscaler"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, target config.Target, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	e.topologyNode.Reset()
 	e.topologyEdge.Reset()
 
@@ -26,7 +25,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		defer bindingsWg.Done()
 		bindings, err := netscaler.GetAllLBVServerServiceBindings(ctx, nsClient)
 		if err != nil {
-			e.logger.Debug("error getting bulk service bindings", "target", target.URL, "err", err)
+			e.logger.Debug("error getting bulk service bindings", "url", e.url, "err", err)
 			return
 		}
 		allSvcBindings = bindings
@@ -36,7 +35,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		defer bindingsWg.Done()
 		bindings, err := netscaler.GetAllLBVServerServiceGroupBindings(ctx, nsClient)
 		if err != nil {
-			e.logger.Debug("error getting bulk servicegroup bindings", "target", target.URL, "err", err)
+			e.logger.Debug("error getting bulk servicegroup bindings", "url", e.url, "err", err)
 			return
 		}
 		allSgBindings = bindings
@@ -46,7 +45,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		defer bindingsWg.Done()
 		bindings, err := netscaler.GetAllCSVServerLBVServerBindings(ctx, nsClient)
 		if err != nil {
-			e.logger.Debug("error getting bulk csvserver bindings", "target", target.URL, "err", err)
+			e.logger.Debug("error getting bulk csvserver bindings", "url", e.url, "err", err)
 			return
 		}
 		allCsBindings = bindings
@@ -73,7 +72,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect LB Virtual Server nodes
 	lbVServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("error getting LB vserver stats for topology", "target", target.URL, "err", err)
+		e.logger.Error("error getting LB vserver stats for topology", "url", e.url, "err", err)
 	} else {
 		for _, vs := range lbVServers.VirtualServerStats {
 			nodeID := "lbvserver:" + vs.Name
@@ -83,7 +82,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			labels := e.buildLabelValues(target, nodeID, vs.Name, "lbvserver", state)
+			labels := e.buildLabelValues(nodeID, vs.Name, "lbvserver", state)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
@@ -91,7 +90,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect CS Virtual Server nodes
 	csVServers, err := netscaler.GetCSVirtualServerStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("error getting CS vserver stats for topology", "target", target.URL, "err", err)
+		e.logger.Error("error getting CS vserver stats for topology", "url", e.url, "err", err)
 	} else {
 		for _, vs := range csVServers.CSVirtualServerStats {
 			nodeID := "csvserver:" + vs.Name
@@ -101,7 +100,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			labels := e.buildLabelValues(target, nodeID, vs.Name, "csvserver", state)
+			labels := e.buildLabelValues(nodeID, vs.Name, "csvserver", state)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
@@ -109,7 +108,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect Service nodes
 	services, err := netscaler.GetServiceStats(ctx, nsClient, "")
 	if err != nil {
-		e.logger.Error("error getting service stats for topology", "target", target.URL, "err", err)
+		e.logger.Error("error getting service stats for topology", "url", e.url, "err", err)
 	} else {
 		for _, svc := range services.ServiceStats {
 			nodeID := "service:" + svc.Name
@@ -119,7 +118,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				state = "UP"
 				value = 1.0
 			}
-			labels := e.buildLabelValues(target, nodeID, svc.Name, "service", state)
+			labels := e.buildLabelValues(nodeID, svc.Name, "service", state)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
@@ -127,11 +126,11 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Collect Service Group nodes
 	serviceGroups, err := netscaler.GetServiceGroups(ctx, nsClient, "attrs=servicegroupname")
 	if err != nil {
-		e.logger.Error("error getting service groups for topology", "target", target.URL, "err", err)
+		e.logger.Error("error getting service groups for topology", "url", e.url, "err", err)
 	} else {
 		for _, sg := range serviceGroups.ServiceGroups {
 			nodeID := "servicegroup:" + sg.Name
-			labels := e.buildLabelValues(target, nodeID, sg.Name, "servicegroup", "UP")
+			labels := e.buildLabelValues(nodeID, sg.Name, "servicegroup", "UP")
 			e.topologyNode.WithLabelValues(labels...).Set(1.0)
 		}
 	}
@@ -148,7 +147,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				if weight == "" {
 					weight = "1"
 				}
-				labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "")
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 
@@ -161,7 +160,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				if weight == "" {
 					weight = "1"
 				}
-				labels := e.buildLabelValues(target, edgeID, sourceID, targetID, weight, "")
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "")
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 		}
@@ -178,7 +177,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				if priority == "" {
 					priority = "0"
 				}
-				labels := e.buildLabelValues(target, edgeID, sourceID, targetID, "", priority)
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, "", priority)
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 		}
