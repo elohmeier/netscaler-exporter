@@ -123,17 +123,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		}
 	}
 
-	// Collect Service Group nodes
-	serviceGroups, err := netscaler.GetServiceGroups(ctx, nsClient, "attrs=servicegroupname")
-	if err != nil {
-		e.logger.Error("error getting service groups for topology", "url", e.url, "err", err)
-	} else {
-		for _, sg := range serviceGroups.ServiceGroups {
-			nodeID := "servicegroup:" + sg.Name
-			labels := e.buildLabelValues(nodeID, sg.Name, "servicegroup", "UP")
-			e.topologyNode.WithLabelValues(labels...).Set(1.0)
-		}
-	}
+	// Note: Service Group nodes are created in the service_groups collector
+	// to avoid redundant API calls (collector.go already fetches servicegroups)
 
 	// Collect LB VServer -> Service and Service Group edges using lookup maps
 	if len(lbVServers.VirtualServerStats) > 0 {

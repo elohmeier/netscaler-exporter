@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -363,6 +364,13 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 					return
 				}
 
+				// Create servicegroup topology node (if topology enabled)
+				if !e.config.IsModuleDisabled("topology") {
+					nodeID := "servicegroup:" + sgName
+					nodeLabels := e.buildLabelValues(nodeID, sgName, "servicegroup", "UP")
+					e.topologyNode.WithLabelValues(nodeLabels...).Set(1.0)
+				}
+
 				stats, err2 := netscaler.GetServiceGroupMemberStats(ctx, nsClient, sgName)
 				if err2 != nil {
 					e.logger.Error("failed to get service group member stats", "service_group", sgName, "url", e.url, "err", err2)
@@ -404,6 +412,25 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 					e.serviceGroupsCurrentReusePool.Collect(ch)
 					e.collectServiceGroupsMaxClients(s, sgName, memberName)
 					e.serviceGroupsMaxClients.Collect(ch)
+
+					// Create topology server node and edge (reusing already-fetched data)
+					if !e.config.IsModuleDisabled("topology") {
+						serverID := fmt.Sprintf("server:%s:%d", s.PrimaryIPAddress, s.PrimaryPort)
+						serverTitle := fmt.Sprintf("%s:%d", s.PrimaryIPAddress, s.PrimaryPort)
+						state := "DOWN"
+						value := 0.0
+						if s.State == "UP" {
+							state = "UP"
+							value = 1.0
+						}
+						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", state)
+						e.topologyNode.WithLabelValues(nodeLabels...).Set(value)
+
+						edgeID := fmt.Sprintf("servicegroup:%s->server:%s:%d", sgName, s.PrimaryIPAddress, s.PrimaryPort)
+						sourceID := "servicegroup:" + sgName
+						edgeLabels := e.buildLabelValues(edgeID, sourceID, serverID, "1", "")
+						e.topologyEdge.WithLabelValues(edgeLabels...).Set(1)
+					}
 				}
 			}()
 		}
