@@ -480,7 +480,8 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 					// Create topology server node and edge (reusing already-fetched data)
 					if !e.config.IsModuleDisabled("topology") {
 						serverID := fmt.Sprintf("server:%s:%d", s.PrimaryIPAddress, s.PrimaryPort)
-						serverTitle := fmt.Sprintf("%s:%d", s.PrimaryIPAddress, s.PrimaryPort)
+						// Use server name (memberName) for title if available, otherwise fall back to IP
+						serverTitle := fmt.Sprintf("%s:%d", memberName, s.PrimaryPort)
 						topoState := "DOWN"
 						value := 0.0
 						if s.State == "UP" {
