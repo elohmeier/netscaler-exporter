@@ -75,7 +75,9 @@ func (c *MPSClient) get(ctx context.Context, path string, querystring string) ([
 		return nil, fmt.Errorf("error creating HTTP request: %w", err)
 	}
 
-	req.SetBasicAuth(c.username, c.password)
+	if c.username != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.client.Do(req)

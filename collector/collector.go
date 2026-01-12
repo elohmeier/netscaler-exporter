@@ -358,11 +358,38 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 			return
 		}
 
+		// Reset all servicegroup metrics once before processing
+		e.serviceGroupsState.Reset()
+		e.serviceGroupsAvgTTFB.Reset()
+		e.serviceGroupsTotalRequests.Reset()
+		e.serviceGroupsTotalResponses.Reset()
+		e.serviceGroupsTotalRequestBytes.Reset()
+		e.serviceGroupsTotalResponseBytes.Reset()
+		e.serviceGroupsCurrentClientConnections.Reset()
+		e.serviceGroupsSurgeCount.Reset()
+		e.serviceGroupsCurrentServerConnections.Reset()
+		e.serviceGroupsServerEstablishedConnections.Reset()
+		e.serviceGroupsCurrentReusePool.Reset()
+		e.serviceGroupsMaxClients.Reset()
+
+		// Use a separate WaitGroup for service group goroutines
+		var sgWg sync.WaitGroup
+
+		// Track seen members globally across all goroutines to prevent duplicates
+		var seenMu sync.Mutex
+		seenMembers := make(map[string]bool)
+
+		// Deduplicate service groups (API may return duplicates)
+		seenServiceGroups := make(map[string]bool)
 		for _, sg := range servicegroups.ServiceGroups {
 			sgName := sg.Name // Capture for closure
-			wg.Add(1)
+			if seenServiceGroups[sgName] {
+				continue
+			}
+			seenServiceGroups[sgName] = true
+			sgWg.Add(1)
 			go func() {
-				defer wg.Done()
+				defer sgWg.Done()
 				select {
 				case sem <- struct{}{}:
 					defer func() { <-sem }()
@@ -396,43 +423,72 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 						memberName = parts[1]
 					}
 
-					e.collectServiceGroupsState(s, sgName, memberName)
-					e.serviceGroupsState.Collect(ch)
-					e.collectServiceGroupsAvgTTFB(s, sgName, memberName)
-					e.serviceGroupsAvgTTFB.Collect(ch)
-					e.collectServiceGroupsTotalRequests(s, sgName, memberName)
-					e.serviceGroupsTotalRequests.Collect(ch)
-					e.collectServiceGroupsTotalResponses(s, sgName, memberName)
-					e.serviceGroupsTotalResponses.Collect(ch)
-					e.collectServiceGroupsTotalRequestBytes(s, sgName, memberName)
-					e.serviceGroupsTotalRequestBytes.Collect(ch)
-					e.collectServiceGroupsTotalResponseBytes(s, sgName, memberName)
-					e.serviceGroupsTotalResponseBytes.Collect(ch)
-					e.collectServiceGroupsCurrentClientConnections(s, sgName, memberName)
-					e.serviceGroupsCurrentClientConnections.Collect(ch)
-					e.collectServiceGroupsSurgeCount(s, sgName, memberName)
-					e.serviceGroupsSurgeCount.Collect(ch)
-					e.collectServiceGroupsCurrentServerConnections(s, sgName, memberName)
-					e.serviceGroupsCurrentServerConnections.Collect(ch)
-					e.collectServiceGroupsServerEstablishedConnections(s, sgName, memberName)
-					e.serviceGroupsServerEstablishedConnections.Collect(ch)
-					e.collectServiceGroupsCurrentReusePool(s, sgName, memberName)
-					e.serviceGroupsCurrentReusePool.Collect(ch)
-					e.collectServiceGroupsMaxClients(s, sgName, memberName)
-					e.serviceGroupsMaxClients.Collect(ch)
+					// Deduplicate members globally (API may return duplicates)
+					key := fmt.Sprintf("%s:%s:%d", sgName, memberName, s.PrimaryPort)
+					seenMu.Lock()
+					if seenMembers[key] {
+						seenMu.Unlock()
+						continue
+					}
+					seenMembers[key] = true
+					seenMu.Unlock()
+
+					// Set metric values (no Reset, no Collect - done once after all goroutines)
+					port := strconv.Itoa(s.PrimaryPort)
+					labels := e.buildLabelValues(sgName, memberName, port)
+
+					state := 0.0
+					if s.State == "UP" {
+						state = 1.0
+					}
+					e.serviceGroupsState.WithLabelValues(labels...).Set(state)
+
+					if val, err := strconv.ParseFloat(s.AvgTimeToFirstByte, 64); err == nil {
+						e.serviceGroupsAvgTTFB.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.TotalRequests, 64); err == nil {
+						e.serviceGroupsTotalRequests.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.TotalResponses, 64); err == nil {
+						e.serviceGroupsTotalResponses.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.TotalRequestBytes, 64); err == nil {
+						e.serviceGroupsTotalRequestBytes.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.TotalResponseBytes, 64); err == nil {
+						e.serviceGroupsTotalResponseBytes.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.CurrentClientConnections, 64); err == nil {
+						e.serviceGroupsCurrentClientConnections.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.SurgeCount, 64); err == nil {
+						e.serviceGroupsSurgeCount.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.CurrentServerConnections, 64); err == nil {
+						e.serviceGroupsCurrentServerConnections.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.ServerEstablishedConnections, 64); err == nil {
+						e.serviceGroupsServerEstablishedConnections.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.CurrentReusePool, 64); err == nil {
+						e.serviceGroupsCurrentReusePool.WithLabelValues(labels...).Set(val)
+					}
+					if val, err := strconv.ParseFloat(s.MaxClients, 64); err == nil {
+						e.serviceGroupsMaxClients.WithLabelValues(labels...).Set(val)
+					}
 
 					// Create topology server node and edge (reusing already-fetched data)
 					if !e.config.IsModuleDisabled("topology") {
 						serverID := fmt.Sprintf("server:%s:%d", s.PrimaryIPAddress, s.PrimaryPort)
 						serverTitle := fmt.Sprintf("%s:%d", s.PrimaryIPAddress, s.PrimaryPort)
-						state := "DOWN"
+						topoState := "DOWN"
 						value := 0.0
 						if s.State == "UP" {
-							state = "UP"
+							topoState = "UP"
 							value = 1.0
 						}
 						// Server inherits chain from its parent servicegroup
-						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", state, sgChain)
+						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", topoState, sgChain)
 						e.topologyNode.WithLabelValues(nodeLabels...).Set(value)
 
 						edgeID := fmt.Sprintf("servicegroup:%s->server:%s:%d", sgName, s.PrimaryIPAddress, s.PrimaryPort)
@@ -443,6 +499,23 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 				}
 			}()
 		}
+
+		// Wait for all service group goroutines to complete
+		sgWg.Wait()
+
+		// Collect all servicegroup metrics once after all data is set
+		e.serviceGroupsState.Collect(ch)
+		e.serviceGroupsAvgTTFB.Collect(ch)
+		e.serviceGroupsTotalRequests.Collect(ch)
+		e.serviceGroupsTotalResponses.Collect(ch)
+		e.serviceGroupsTotalRequestBytes.Collect(ch)
+		e.serviceGroupsTotalResponseBytes.Collect(ch)
+		e.serviceGroupsCurrentClientConnections.Collect(ch)
+		e.serviceGroupsSurgeCount.Collect(ch)
+		e.serviceGroupsCurrentServerConnections.Collect(ch)
+		e.serviceGroupsServerEstablishedConnections.Collect(ch)
+		e.serviceGroupsCurrentReusePool.Collect(ch)
+		e.serviceGroupsMaxClients.Collect(ch)
 	})
 
 	// 12. Protocol HTTP Stats
@@ -486,6 +559,12 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 	})
 
 	wg.Wait()
+
+	// Collect topology metrics after all modules have added their nodes/edges
+	if !e.config.IsModuleDisabled("topology") {
+		e.topologyNode.Collect(ch)
+		e.topologyEdge.Collect(ch)
+	}
 }
 
 // scrapeMPS scrapes the Citrix ADM (MPS) instance

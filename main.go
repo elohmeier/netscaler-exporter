@@ -98,11 +98,10 @@ func main() {
 		DisabledModules: disabled,
 	}
 
-	// Get credentials from environment
-	username, password, err := config.GetCredentials()
-	if err != nil {
-		logger.Error("failed to get credentials", "err", err)
-		os.Exit(1)
+	// Get credentials from environment (optional for unauthenticated access)
+	username, password := config.GetCredentials()
+	if username == "" {
+		logger.Info("no credentials provided, running without authentication")
 	}
 
 	ignoreCert := config.GetIgnoreCert()

@@ -185,8 +185,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		}
 	}
 
-	e.topologyNode.Collect(ch)
-	e.topologyEdge.Collect(ch)
+	// Note: Collect() is called later in scrapeADC after service_groups has added its nodes/edges
 }
 
 // buildChainMembership computes which chain(s) each node belongs to.

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -34,18 +33,11 @@ func (c *Config) LabelKeys() []string {
 }
 
 // GetCredentials reads credentials from environment variables.
-func GetCredentials() (username, password string, err error) {
+// Returns empty strings if credentials are not set (for unauthenticated access).
+func GetCredentials() (username, password string) {
 	username = os.Getenv("NETSCALER_USERNAME")
-	if username == "" {
-		return "", "", fmt.Errorf("NETSCALER_USERNAME environment variable is required")
-	}
-
 	password = os.Getenv("NETSCALER_PASSWORD")
-	if password == "" {
-		return "", "", fmt.Errorf("NETSCALER_PASSWORD environment variable is required")
-	}
-
-	return username, password, nil
+	return username, password
 }
 
 // GetIgnoreCert reads the ignore cert setting from environment variable.
