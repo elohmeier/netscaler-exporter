@@ -190,6 +190,51 @@ func GetAllCSVServerLBVServerBindings(ctx context.Context, c *NitroClient) ([]CS
 	return response.CSVServerLBVServerBindings, nil
 }
 
+// GetAllCSVServerCSPolicyBindings retrieves all CS policy bindings for all CS vservers in one call.
+func GetAllCSVServerCSPolicyBindings(ctx context.Context, c *NitroClient) ([]CSVServerCSPolicyBinding, error) {
+	body, err := c.GetConfig(ctx, "csvserver_cspolicy_binding", "bulkbindings=yes")
+	if err != nil {
+		return nil, fmt.Errorf("error getting bulk csvserver_cspolicy_binding: %w", err)
+	}
+
+	var response BulkCSVServerCSPolicyBindingResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling bulk csvserver_cspolicy_binding: %w", err)
+	}
+
+	return response.CSVServerCSPolicyBindings, nil
+}
+
+// GetAllCSPolicies retrieves all CS policies.
+func GetAllCSPolicies(ctx context.Context, c *NitroClient) ([]CSPolicy, error) {
+	body, err := c.GetConfig(ctx, "cspolicy", "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting cspolicy: %w", err)
+	}
+
+	var response CSPolicyResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling cspolicy: %w", err)
+	}
+
+	return response.CSPolicies, nil
+}
+
+// GetAllCSActions retrieves all CS actions.
+func GetAllCSActions(ctx context.Context, c *NitroClient) ([]CSAction, error) {
+	body, err := c.GetConfig(ctx, "csaction", "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting csaction: %w", err)
+	}
+
+	var response CSActionResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling csaction: %w", err)
+	}
+
+	return response.CSActions, nil
+}
+
 // GetProtocolHTTPStats queries the Nitro API for protocol HTTP stats
 func GetProtocolHTTPStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
 	return getStats(ctx, c, "protocolhttp", querystring)

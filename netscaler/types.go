@@ -461,3 +461,40 @@ type BulkLBVServerServiceGroupBindingResponse struct {
 type BulkCSVServerLBVServerBindingResponse struct {
 	CSVServerLBVServerBindings []CSVServerLBVServerBinding `json:"csvserver_lbvserver_binding,omitempty"`
 }
+
+// CSVServerCSPolicyBinding represents a binding between a CS virtual server and a CS policy.
+// The targetlbvserver may be set directly on the binding, or determined via policy → action.
+type CSVServerCSPolicyBinding struct {
+	Name            string `json:"name"`            // CS vserver name
+	PolicyName      string `json:"policyname"`      // CS policy name
+	Priority        string `json:"priority"`        // Policy priority
+	TargetLBVServer string `json:"targetlbvserver"` // Direct target (optional, may be empty)
+}
+
+// CSPolicy represents a content switching policy.
+type CSPolicy struct {
+	PolicyName string `json:"policyname"` // Policy name
+	Action     string `json:"action"`     // Action name (references csaction)
+	Rule       string `json:"rule"`       // Policy rule expression
+}
+
+// CSAction represents a content switching action.
+type CSAction struct {
+	Name            string `json:"name"`            // Action name
+	TargetLBVServer string `json:"targetlbvserver"` // Target LB vserver
+}
+
+// BulkCSVServerCSPolicyBindingResponse for csvserver_cspolicy_binding?bulkbindings=yes response
+type BulkCSVServerCSPolicyBindingResponse struct {
+	CSVServerCSPolicyBindings []CSVServerCSPolicyBinding `json:"csvserver_cspolicy_binding,omitempty"`
+}
+
+// CSPolicyResponse for cspolicy config response
+type CSPolicyResponse struct {
+	CSPolicies []CSPolicy `json:"cspolicy,omitempty"`
+}
+
+// CSActionResponse for csaction config response
+type CSActionResponse struct {
+	CSActions []CSAction `json:"csaction,omitempty"`
+}

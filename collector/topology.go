@@ -11,17 +11,28 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// CSToLBMapping represents a resolved CS vserver → LB vserver relationship.
+type CSToLBMapping struct {
+	CSVServer   string
+	LBVServer   string
+	Priority    string
+	PolicyName  string // For policy-based routing
+}
+
 func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	e.topologyNode.Reset()
 	e.topologyEdge.Reset()
 
-	// Fetch all bindings in parallel using bulk APIs (3 API calls instead of 152+)
+	// Fetch all bindings in parallel using bulk APIs
 	var allSvcBindings []netscaler.LBVServerServiceBinding
 	var allSgBindings []netscaler.LBVServerServiceGroupBinding
-	var allCsBindings []netscaler.CSVServerLBVServerBinding
+	var allCsLbBindings []netscaler.CSVServerLBVServerBinding
+	var allCsPolicyBindings []netscaler.CSVServerCSPolicyBinding
+	var allCsPolicies []netscaler.CSPolicy
+	var allCsActions []netscaler.CSAction
 
 	var bindingsWg sync.WaitGroup
-	bindingsWg.Add(3)
+	bindingsWg.Add(6)
 
 	go func() {
 		defer bindingsWg.Done()
@@ -47,10 +58,40 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		defer bindingsWg.Done()
 		bindings, err := netscaler.GetAllCSVServerLBVServerBindings(ctx, nsClient)
 		if err != nil {
-			e.logger.Debug("error getting bulk csvserver bindings", "url", e.url, "err", err)
+			e.logger.Debug("error getting bulk csvserver_lbvserver bindings", "url", e.url, "err", err)
 			return
 		}
-		allCsBindings = bindings
+		allCsLbBindings = bindings
+	}()
+
+	go func() {
+		defer bindingsWg.Done()
+		bindings, err := netscaler.GetAllCSVServerCSPolicyBindings(ctx, nsClient)
+		if err != nil {
+			e.logger.Debug("error getting bulk csvserver_cspolicy bindings", "url", e.url, "err", err)
+			return
+		}
+		allCsPolicyBindings = bindings
+	}()
+
+	go func() {
+		defer bindingsWg.Done()
+		policies, err := netscaler.GetAllCSPolicies(ctx, nsClient)
+		if err != nil {
+			e.logger.Debug("error getting cspolicies", "url", e.url, "err", err)
+			return
+		}
+		allCsPolicies = policies
+	}()
+
+	go func() {
+		defer bindingsWg.Done()
+		actions, err := netscaler.GetAllCSActions(ctx, nsClient)
+		if err != nil {
+			e.logger.Debug("error getting csactions", "url", e.url, "err", err)
+			return
+		}
+		allCsActions = actions
 	}()
 
 	bindingsWg.Wait()
@@ -66,9 +107,29 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		sgBindingsByVS[b.Name] = append(sgBindingsByVS[b.Name], b)
 	}
 
-	csBindingsByVS := make(map[string][]netscaler.CSVServerLBVServerBinding)
-	for _, b := range allCsBindings {
-		csBindingsByVS[b.Name] = append(csBindingsByVS[b.Name], b)
+	// Build policy → action lookup
+	policyToAction := make(map[string]string)
+	for _, p := range allCsPolicies {
+		if p.Action != "" {
+			policyToAction[p.PolicyName] = p.Action
+		}
+	}
+
+	// Build action → targetlbvserver lookup
+	actionToLB := make(map[string]string)
+	for _, a := range allCsActions {
+		if a.TargetLBVServer != "" {
+			actionToLB[a.Name] = a.TargetLBVServer
+		}
+	}
+
+	// Resolve all CS → LB mappings from multiple sources
+	csToLBMappings := e.resolveCSToLBMappings(allCsLbBindings, allCsPolicyBindings, policyToAction, actionToLB)
+
+	// Build csBindingsByVS for edge creation and chain membership
+	csBindingsByVS := make(map[string][]CSToLBMapping)
+	for _, m := range csToLBMappings {
+		csBindingsByVS[m.CSVServer] = append(csBindingsByVS[m.CSVServer], m)
 	}
 
 	// Build chain membership map
@@ -166,16 +227,16 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		}
 	}
 
-	// Collect CS VServer -> LB VServer edges using lookup map
+	// Collect CS VServer -> LB VServer edges using resolved mappings
 	if len(csVServers.CSVirtualServerStats) > 0 {
 		for _, vs := range csVServers.CSVirtualServerStats {
 			sourceID := "csvserver:" + vs.Name
 			sourceChain := e.chainMembership[sourceID]
 
-			for _, b := range csBindingsByVS[vs.Name] {
-				edgeID := "csvserver:" + b.Name + "->lbvserver:" + b.LBVServer
-				targetID := "lbvserver:" + b.LBVServer
-				priority := b.Priority
+			for _, m := range csBindingsByVS[vs.Name] {
+				edgeID := "csvserver:" + m.CSVServer + "->lbvserver:" + m.LBVServer
+				targetID := "lbvserver:" + m.LBVServer
+				priority := m.Priority
 				if priority == "" {
 					priority = "0"
 				}
@@ -188,11 +249,67 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	// Note: Collect() is called later in scrapeADC after service_groups has added its nodes/edges
 }
 
+// resolveCSToLBMappings resolves all CS vserver → LB vserver relationships from multiple sources:
+// 1. Direct csvserver_lbvserver_binding entries
+// 2. Policy bindings with direct targetlbvserver
+// 3. Policy bindings resolved via policy → action → targetlbvserver
+func (e *Exporter) resolveCSToLBMappings(
+	directBindings []netscaler.CSVServerLBVServerBinding,
+	policyBindings []netscaler.CSVServerCSPolicyBinding,
+	policyToAction map[string]string,
+	actionToLB map[string]string,
+) []CSToLBMapping {
+	var mappings []CSToLBMapping
+
+	// Track seen mappings to avoid duplicates (CS+LB pair)
+	seen := make(map[string]bool)
+	addMapping := func(csv, lb, priority, policy string) {
+		key := csv + ":" + lb
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		mappings = append(mappings, CSToLBMapping{
+			CSVServer:  csv,
+			LBVServer:  lb,
+			Priority:   priority,
+			PolicyName: policy,
+		})
+	}
+
+	// 1. Direct bindings (csvserver_lbvserver_binding)
+	for _, b := range directBindings {
+		addMapping(b.Name, b.LBVServer, b.Priority, "")
+	}
+
+	// 2. Policy bindings
+	for _, pb := range policyBindings {
+		var targetLB string
+
+		// Check if binding has direct targetlbvserver
+		if pb.TargetLBVServer != "" {
+			targetLB = pb.TargetLBVServer
+		} else {
+			// Resolve via policy → action → targetlbvserver
+			actionName := policyToAction[pb.PolicyName]
+			if actionName != "" {
+				targetLB = actionToLB[actionName]
+			}
+		}
+
+		if targetLB != "" {
+			addMapping(pb.Name, targetLB, pb.Priority, pb.PolicyName)
+		}
+	}
+
+	return mappings
+}
+
 // buildChainMembership computes which chain(s) each node belongs to.
 // A chain is identified by its top-level frontend: csvserver name, or lbvserver name if standalone.
 // Returns map[nodeID] → comma-separated chain names (sorted alphabetically).
 func (e *Exporter) buildChainMembership(
-	csBindingsByVS map[string][]netscaler.CSVServerLBVServerBinding,
+	csBindingsByVS map[string][]CSToLBMapping,
 	svcBindingsByVS map[string][]netscaler.LBVServerServiceBinding,
 	sgBindingsByVS map[string][]netscaler.LBVServerServiceGroupBinding,
 ) map[string]string {
@@ -211,31 +328,31 @@ func (e *Exporter) buildChainMembership(
 
 	// Build reverse lookup: lbvserver → csvservers that reference it
 	lbToCsMap := make(map[string][]string)
-	for csvName, bindings := range csBindingsByVS {
-		for _, b := range bindings {
-			lbToCsMap[b.LBVServer] = append(lbToCsMap[b.LBVServer], csvName)
+	for csvName, mappings := range csBindingsByVS {
+		for _, m := range mappings {
+			lbToCsMap[m.LBVServer] = append(lbToCsMap[m.LBVServer], csvName)
 		}
 	}
 
 	// Process csvservers: each csvserver is its own chain
-	for csvName, bindings := range csBindingsByVS {
+	for csvName, mappings := range csBindingsByVS {
 		chain := csvName
 		csvNodeID := "csvserver:" + csvName
 		addChain(csvNodeID, chain)
 
 		// Traverse to lbvservers
-		for _, b := range bindings {
-			lbNodeID := "lbvserver:" + b.LBVServer
+		for _, m := range mappings {
+			lbNodeID := "lbvserver:" + m.LBVServer
 			addChain(lbNodeID, chain)
 
 			// Traverse from lbvserver to services
-			for _, svcB := range svcBindingsByVS[b.LBVServer] {
+			for _, svcB := range svcBindingsByVS[m.LBVServer] {
 				svcNodeID := "service:" + svcB.ServiceName
 				addChain(svcNodeID, chain)
 			}
 
 			// Traverse from lbvserver to servicegroups
-			for _, sgB := range sgBindingsByVS[b.LBVServer] {
+			for _, sgB := range sgBindingsByVS[m.LBVServer] {
 				sgNodeID := "servicegroup:" + sgB.ServiceGroupName
 				addChain(sgNodeID, chain)
 			}
