@@ -1,0 +1,976 @@
+{
+   "description": "Chain-focused view for NetScaler consumers - select chains to see routing topology and health",
+   "graphTooltip": 1,
+   "panels": [
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "title": "Topology",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "description": "Routing topology: CS vServer -> LB vServer -> Service Group -> Server",
+         "gridPos": {
+            "h": 25,
+            "w": 24,
+            "x": 0,
+            "y": 1
+         },
+         "id": 2,
+         "options": {
+            "edges": { },
+            "layoutAlgorithm": "layered",
+            "nodes": { },
+            "zoomMode": "cooperative"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_topology_node{chain=~\"$chain\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": ""
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_topology_edge{chain=~\"$chain\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": ""
+            }
+         ],
+         "title": "Chain Topology",
+         "type": "nodeGraph"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+         },
+         "id": 3,
+         "panels": [ ],
+         "title": "Chain Health",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "mappings": [
+                  {
+                     "options": {
+                        "0": {
+                           "color": "red",
+                           "text": "DOWN"
+                        },
+                        "1": {
+                           "color": "green",
+                           "text": "UP"
+                        }
+                     },
+                     "type": "value"
+                  }
+               ],
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "red",
+                        "value": null
+                     },
+                     {
+                        "color": "green",
+                        "value": 1
+                     }
+                  ]
+               }
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 27
+         },
+         "id": 4,
+         "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_cs_virtual_servers_state{virtual_server=~\"$chain\"}",
+               "legendFormat": "CS: {{virtual_server}}"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_state{virtual_server=~\"$chain\"}",
+               "legendFormat": "LB: {{virtual_server}}"
+            }
+         ],
+         "title": "Chain Root State",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 35
+         },
+         "id": 5,
+         "options": {
+            "colorMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_cs_virtual_servers_total_hits{virtual_server=~\"$chain\"}",
+               "legendFormat": "CS"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_total_hits{virtual_server=~\"$chain\"}",
+               "legendFormat": "LB"
+            }
+         ],
+         "title": "Total Hits",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 43
+         },
+         "id": 6,
+         "options": {
+            "colorMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_cs_virtual_servers_current_client_connections{virtual_server=~\"$chain\"}",
+               "legendFormat": "CS Client"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_current_client_connections{virtual_server=~\"$chain\"}",
+               "legendFormat": "LB Client"
+            }
+         ],
+         "title": "Active Connections",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 51
+         },
+         "id": 7,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_topology_node{chain=~\"$chain\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": ""
+            }
+         ],
+         "title": "Chain Components",
+         "transformations": [
+            {
+               "id": "organize",
+               "options": {
+                  "excludeByName": {
+                     "Time": true,
+                     "Value": true,
+                     "__name__": true,
+                     "chain": true,
+                     "id": true,
+                     "instance": true,
+                     "job": true,
+                     "netscaler": true
+                  },
+                  "renameByName": {
+                     "node_type": "Type",
+                     "state": "State",
+                     "title": "Component"
+                  }
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 59
+         },
+         "id": 8,
+         "panels": [ ],
+         "title": "LB Virtual Servers",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 60
+         },
+         "id": 9,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_state{virtual_server=~\"$lbvserver\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": "",
+               "refId": "A"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_health{virtual_server=~\"$lbvserver\"}",
+               "format": "table",
+               "instant": true,
+               "legendFormat": "",
+               "refId": "B"
+            }
+         ],
+         "title": "LB vServer States",
+         "transformations": [
+            {
+               "id": "joinByField",
+               "options": {
+                  "byField": "virtual_server",
+                  "mode": "outer"
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "excludeByName": {
+                     "Time": true,
+                     "Time 1": true,
+                     "Time 2": true,
+                     "__name__": true,
+                     "__name__ 1": true,
+                     "__name__ 2": true,
+                     "instance": true,
+                     "instance 1": true,
+                     "instance 2": true,
+                     "job": true,
+                     "job 1": true,
+                     "job 2": true,
+                     "netscaler": true,
+                     "netscaler 1": true,
+                     "netscaler 2": true
+                  },
+                  "indexByName": {
+                     "Value #A": 1,
+                     "Value #B": 2,
+                     "virtual_server": 0
+                  },
+                  "renameByName": {
+                     "Value #A": "State",
+                     "Value #B": "Health %",
+                     "virtual_server": "LB vServer"
+                  }
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "max": 100,
+               "min": 0,
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "red",
+                        "value": null
+                     },
+                     {
+                        "color": "yellow",
+                        "value": 50
+                     },
+                     {
+                        "color": "green",
+                        "value": 100
+                     }
+                  ]
+               },
+               "unit": "percent"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 68
+         },
+         "id": 10,
+         "options": {
+            "displayMode": "gradient",
+            "orientation": "horizontal"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_health{virtual_server=~\"$lbvserver\"}",
+               "legendFormat": "{{virtual_server}}"
+            }
+         ],
+         "title": "LB vServer Health",
+         "type": "bargauge"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "short"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 76
+         },
+         "id": 11,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_active_services{virtual_server=~\"$lbvserver\"}",
+               "legendFormat": "{{virtual_server}} Active"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "netscaler_virtual_servers_inactive_services{virtual_server=~\"$lbvserver\"}",
+               "legendFormat": "{{virtual_server}} Inactive"
+            }
+         ],
+         "title": "Active / Inactive Services",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "reqps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 84
+         },
+         "id": 12,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "rate(netscaler_virtual_servers_total_requests{virtual_server=~\"$lbvserver\"}[$__rate_interval])",
+               "legendFormat": "{{virtual_server}}"
+            }
+         ],
+         "title": "LB Requests",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "unit": "Bps"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 92
+         },
+         "id": 13,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "rate(netscaler_virtual_servers_total_request_bytes{virtual_server=~\"$lbvserver\"}[$__rate_interval])",
+               "legendFormat": "{{virtual_server}} RX"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "rate(netscaler_virtual_servers_total_response_bytes{virtual_server=~\"$lbvserver\"}[$__rate_interval])",
+               "legendFormat": "{{virtual_server}} TX"
+            }
+         ],
+         "title": "LB Traffic",
+         "type": "timeseries"
+      },
+      {
+         "collapsed": true,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 100
+         },
+         "id": 14,
+         "panels": [
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "gridPos": {
+                  "h": 8,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 15,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "netscaler_servicegroup_state{servicegroup=~\"$servicegroup\"}",
+                     "format": "table",
+                     "instant": true,
+                     "legendFormat": "",
+                     "refId": "A"
+                  },
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "netscaler_servicegroup_average_time_to_first_byte{servicegroup=~\"$servicegroup\"}",
+                     "format": "table",
+                     "instant": true,
+                     "legendFormat": "",
+                     "refId": "B"
+                  }
+               ],
+               "title": "Service Group Members",
+               "transformations": [
+                  {
+                     "id": "joinByField",
+                     "options": {
+                        "byField": "member",
+                        "mode": "outer"
+                     }
+                  },
+                  {
+                     "id": "organize",
+                     "options": {
+                        "excludeByName": {
+                           "Time": true,
+                           "Time 1": true,
+                           "Time 2": true,
+                           "__name__": true,
+                           "__name__ 1": true,
+                           "__name__ 2": true,
+                           "instance": true,
+                           "instance 1": true,
+                           "instance 2": true,
+                           "job": true,
+                           "job 1": true,
+                           "job 2": true,
+                           "netscaler": true,
+                           "netscaler 1": true,
+                           "netscaler 2": true,
+                           "port 1": true,
+                           "port 2": true,
+                           "servicegroup 1": true,
+                           "servicegroup 2": true
+                        },
+                        "indexByName": {
+                           "Value #A": 3,
+                           "Value #B": 4,
+                           "member": 1,
+                           "port": 2,
+                           "servicegroup": 0
+                        },
+                        "renameByName": {
+                           "Value #A": "State",
+                           "Value #B": "TTFB (ms)",
+                           "member": "Member",
+                           "port": "Port",
+                           "servicegroup": "Service Group"
+                        }
+                     }
+                  }
+               ],
+               "type": "table"
+            },
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": {
+                     "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                           {
+                              "color": "green",
+                              "value": null
+                           },
+                           {
+                              "color": "yellow",
+                              "value": 100
+                           },
+                           {
+                              "color": "red",
+                              "value": 500
+                           }
+                        ]
+                     },
+                     "unit": "ms"
+                  }
+               },
+               "gridPos": {
+                  "h": 8,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 16,
+               "options": {
+                  "displayMode": "gradient",
+                  "orientation": "horizontal"
+               },
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "netscaler_servicegroup_average_time_to_first_byte{servicegroup=~\"$servicegroup\"}",
+                     "legendFormat": "{{member}}:{{port}}"
+                  }
+               ],
+               "title": "TTFB per Member",
+               "type": "bargauge"
+            },
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": {
+                     "unit": "reqps"
+                  }
+               },
+               "gridPos": {
+                  "h": 8,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 17,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "rate(netscaler_servicegroup_total_requests{servicegroup=~\"$servicegroup\"}[$__rate_interval])",
+                     "legendFormat": "{{member}}:{{port}}"
+                  }
+               ],
+               "title": "Member Requests",
+               "type": "timeseries"
+            },
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": {
+                     "unit": "short"
+                  }
+               },
+               "gridPos": {
+                  "h": 8,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 18,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "netscaler_servicegroup_current_server_connections{servicegroup=~\"$servicegroup\"}",
+                     "legendFormat": "{{member}}:{{port}}"
+                  }
+               ],
+               "title": "Member Connections",
+               "type": "timeseries"
+            }
+         ],
+         "title": "Service Groups",
+         "type": "row"
+      },
+      {
+         "collapsed": true,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 101
+         },
+         "id": 19,
+         "panels": [
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "gridPos": {
+                  "h": 8,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 20,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "netscaler_topology_node{chain=~\"$chain\",node_type=\"server\"}",
+                     "format": "table",
+                     "instant": true,
+                     "legendFormat": ""
+                  }
+               ],
+               "title": "Backend Server States",
+               "transformations": [
+                  {
+                     "id": "organize",
+                     "options": {
+                        "excludeByName": {
+                           "Time": true,
+                           "Value": true,
+                           "__name__": true,
+                           "chain": true,
+                           "id": true,
+                           "instance": true,
+                           "job": true,
+                           "netscaler": true,
+                           "node_type": true
+                        },
+                        "indexByName": {
+                           "state": 1,
+                           "title": 0
+                        },
+                        "renameByName": {
+                           "state": "State",
+                           "title": "Server"
+                        }
+                     }
+                  }
+               ],
+               "type": "table"
+            },
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "gridPos": {
+                  "h": 8,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 21,
+               "options": {
+                  "colorMode": "none",
+                  "graphMode": "none"
+               },
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "count(netscaler_topology_node{chain=~\"$chain\",node_type=\"server\",state=\"UP\"}) or vector(0)",
+                     "legendFormat": "UP"
+                  },
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "count(netscaler_topology_node{chain=~\"$chain\",node_type=\"server\"}) or vector(0)",
+                     "legendFormat": "Total"
+                  }
+               ],
+               "title": "Servers UP",
+               "type": "stat"
+            },
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": {
+                     "color": {
+                        "fixedColor": "red",
+                        "mode": "fixed"
+                     }
+                  }
+               },
+               "gridPos": {
+                  "h": 8,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 22,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "netscaler_topology_node{chain=~\"$chain\",node_type=\"server\",state=\"DOWN\"}",
+                     "format": "table",
+                     "instant": true,
+                     "legendFormat": ""
+                  }
+               ],
+               "title": "Down Servers",
+               "transformations": [
+                  {
+                     "id": "organize",
+                     "options": {
+                        "excludeByName": {
+                           "Time": true,
+                           "Value": true,
+                           "__name__": true,
+                           "chain": true,
+                           "id": true,
+                           "instance": true,
+                           "job": true,
+                           "netscaler": true,
+                           "node_type": true,
+                           "state": true
+                        },
+                        "renameByName": {
+                           "title": "Server"
+                        }
+                     }
+                  }
+               ],
+               "type": "table"
+            }
+         ],
+         "title": "Backend Servers",
+         "type": "row"
+      }
+   ],
+   "refresh": "1m",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "label": "Data source",
+            "name": "datasource",
+            "query": "prometheus",
+            "type": "datasource"
+         },
+         {
+            "allowCustomValue": true,
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${datasource}"
+            },
+            "label": "Chain",
+            "multi": true,
+            "name": "chain",
+            "query": "label_values(netscaler_topology_node{chain!=\"\"}, chain)",
+            "refresh": "time",
+            "type": "query"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${datasource}"
+            },
+            "includeAll": true,
+            "label": "LB vServer",
+            "multi": true,
+            "name": "lbvserver",
+            "query": "label_values(netscaler_topology_node{chain=~\"$chain\",node_type=\"lbvserver\"}, title)",
+            "refresh": "time",
+            "type": "query"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${datasource}"
+            },
+            "includeAll": true,
+            "label": "Service Group",
+            "multi": true,
+            "name": "servicegroup",
+            "query": "label_values(netscaler_topology_node{chain=~\"$chain\",node_type=\"servicegroup\"}, title)",
+            "refresh": "time",
+            "type": "query"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-1h",
+      "to": "now"
+   },
+   "timezone": "browser",
+   "title": "NetScaler Chain Dashboard",
+   "uid": "netscaler-chain"
+}

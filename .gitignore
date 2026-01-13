@@ -1,2 +1,3 @@
 *.mitmlog
 netscaler-exporter
+dashboards/vendor
