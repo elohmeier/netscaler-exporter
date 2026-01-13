@@ -19,7 +19,7 @@
             "type": "datasource",
             "uid": "-- Mixed --"
          },
-         "description": "Routing topology: CS vServer -> LB vServer -> Service Group -> Server",
+         "description": "Routing topology: CS vServer -> LB vServer -> Service Group -> Server. LB shows health %, servers show TTFB (ms).",
          "gridPos": {
             "h": 25,
             "w": 24,
@@ -30,7 +30,10 @@
          "options": {
             "edges": { },
             "layoutAlgorithm": "layered",
-            "nodes": { },
+            "nodes": {
+               "mainStatUnit": "short",
+               "secondaryStatUnit": "short"
+            },
             "zoomMode": "cooperative"
          },
          "pluginVersion": "v11.4.0",
@@ -43,7 +46,8 @@
                "expr": "netscaler_topology_node{chain=~\"$chain\"}",
                "format": "table",
                "instant": true,
-               "legendFormat": ""
+               "legendFormat": "",
+               "refId": "nodes"
             },
             {
                "datasource": {
@@ -53,10 +57,41 @@
                "expr": "netscaler_topology_edge{chain=~\"$chain\"}",
                "format": "table",
                "instant": true,
-               "legendFormat": ""
+               "legendFormat": "",
+               "refId": "edges"
             }
          ],
          "title": "Chain Topology",
+         "transformations": [
+            {
+               "id": "convertFieldType",
+               "options": {
+                  "conversions": [
+                     {
+                        "destinationType": "number",
+                        "targetField": "mainStat"
+                     },
+                     {
+                        "destinationType": "number",
+                        "targetField": "secondaryStat"
+                     }
+                  ]
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "excludeByName": {
+                     "Time": true,
+                     "Value": true,
+                     "__name__": true,
+                     "instance": true,
+                     "job": true,
+                     "netscaler": true
+                  }
+               }
+            }
+         ],
          "type": "nodeGraph"
       },
       {

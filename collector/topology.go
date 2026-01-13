@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -22,6 +23,11 @@ type CSToLBMapping struct {
 func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
 	e.topologyNode.Reset()
 	e.topologyEdge.Reset()
+	e.topologyNodeState.Reset()
+	e.topologyNodeHealth.Reset()
+	e.topologyNodeRequestsTotal.Reset()
+	e.topologyNodeConnections.Reset()
+	e.topologyNodeTTFBMs.Reset()
 
 	// Fetch all bindings in parallel using bulk APIs
 	var allSvcBindings []netscaler.LBVServerServiceBinding
@@ -149,8 +155,27 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				value = 1.0
 			}
 			chain := e.chainMembership[nodeID]
-			labels := e.buildLabelValues(nodeID, vs.Name, "lbvserver", state, chain)
+
+			// mainStat = health %, secondaryStat = connections
+			mainStat := vs.Health
+			secondaryStat := vs.CurrentClientConnections
+
+			labels := e.buildLabelValues(nodeID, vs.Name, "lbvserver", state, chain, mainStat, secondaryStat)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
+
+			// Emit topology node stats
+			statsLabels := e.buildLabelValues(nodeID, "lbvserver", chain)
+			e.topologyNodeState.WithLabelValues(statsLabels...).Set(value)
+
+			if health, err := strconv.ParseFloat(vs.Health, 64); err == nil {
+				e.topologyNodeHealth.WithLabelValues(statsLabels...).Set(health)
+			}
+			if requests, err := strconv.ParseFloat(vs.TotalRequests, 64); err == nil {
+				e.topologyNodeRequestsTotal.WithLabelValues(statsLabels...).Set(requests)
+			}
+			if conns, err := strconv.ParseFloat(vs.CurrentClientConnections, 64); err == nil {
+				e.topologyNodeConnections.WithLabelValues(statsLabels...).Set(conns)
+			}
 		}
 	}
 
@@ -168,8 +193,24 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				value = 1.0
 			}
 			chain := e.chainMembership[nodeID]
-			labels := e.buildLabelValues(nodeID, vs.Name, "csvserver", state, chain)
+
+			// CS vservers: mainStat = "" (no health), secondaryStat = connections
+			mainStat := ""
+			secondaryStat := vs.CurrentClientConnections
+
+			labels := e.buildLabelValues(nodeID, vs.Name, "csvserver", state, chain, mainStat, secondaryStat)
 			e.topologyNode.WithLabelValues(labels...).Set(value)
+
+			// Emit topology node stats (CS vservers use total_hits as main stat)
+			statsLabels := e.buildLabelValues(nodeID, "csvserver", chain)
+			e.topologyNodeState.WithLabelValues(statsLabels...).Set(value)
+
+			if hits, err := strconv.ParseFloat(vs.TotalHits, 64); err == nil {
+				e.topologyNodeRequestsTotal.WithLabelValues(statsLabels...).Set(hits)
+			}
+			if conns, err := strconv.ParseFloat(vs.CurrentClientConnections, 64); err == nil {
+				e.topologyNodeConnections.WithLabelValues(statsLabels...).Set(conns)
+			}
 		}
 	}
 
@@ -187,7 +228,9 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				value = 1.0
 			}
 			chain := e.chainMembership[nodeID]
-			labels := e.buildLabelValues(nodeID, svc.Name, "service", state, chain)
+
+			// Services: mainStat = "", secondaryStat = ""
+			labels := e.buildLabelValues(nodeID, svc.Name, "service", state, chain, "", "")
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}

@@ -393,13 +393,11 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 					return
 				}
 
-				// Create servicegroup topology node (if topology enabled)
+				// Lookup chain membership for topology (node created after stats aggregation)
 				var sgChain string
+				sgNodeID := "servicegroup:" + sgName
 				if !e.config.IsModuleDisabled("topology") {
-					nodeID := "servicegroup:" + sgName
-					sgChain = e.chainMembership[nodeID]
-					nodeLabels := e.buildLabelValues(nodeID, sgName, "servicegroup", "UP", sgChain)
-					e.topologyNode.WithLabelValues(nodeLabels...).Set(1.0)
+					sgChain = e.chainMembership[sgNodeID]
 				}
 
 				stats, err2 := netscaler.GetServiceGroupMemberStats(ctx, nsClient, sgName)
@@ -411,6 +409,12 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 				if len(stats.ServiceGroups) == 0 || len(stats.ServiceGroups[0].ServiceGroupMembers) == 0 {
 					return
 				}
+
+				// Track aggregates for servicegroup stats
+				var sgTotalRequests float64
+				var sgTotalTTFB float64
+				var sgMemberCount int
+				var sgUpCount int
 
 				for _, s := range stats.ServiceGroups[0].ServiceGroupMembers {
 					// Extract member name from ServiceGroupName (format: "sgname?servername" or use IP)
@@ -436,8 +440,18 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 					state := 0.0
 					if s.State == "UP" {
 						state = 1.0
+						sgUpCount++
 					}
 					e.serviceGroupsState.WithLabelValues(labels...).Set(state)
+
+					// Aggregate stats for servicegroup topology node
+					sgMemberCount++
+					if val, err := strconv.ParseFloat(s.TotalRequests, 64); err == nil {
+						sgTotalRequests += val
+					}
+					if val, err := strconv.ParseFloat(s.AvgTimeToFirstByte, 64); err == nil {
+						sgTotalTTFB += val
+					}
 
 					if val, err := strconv.ParseFloat(s.AvgTimeToFirstByte, 64); err == nil {
 						e.serviceGroupsAvgTTFB.WithLabelValues(labels...).Set(val)
@@ -485,13 +499,58 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 							value = 1.0
 						}
 						// Server inherits chain from its parent servicegroup
-						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", topoState, sgChain)
+						// mainStat = TTFB (ms), secondaryStat = connections
+						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", topoState, sgChain, s.AvgTimeToFirstByte, s.CurrentServerConnections)
 						e.topologyNode.WithLabelValues(nodeLabels...).Set(value)
 
 						edgeID := fmt.Sprintf("servicegroup:%s->server:%s:%d", sgName, s.PrimaryIPAddress, s.PrimaryPort)
 						sourceID := "servicegroup:" + sgName
 						edgeLabels := e.buildLabelValues(edgeID, sourceID, serverID, "1", "", sgChain)
 						e.topologyEdge.WithLabelValues(edgeLabels...).Set(1)
+
+						// Emit topology node stats for server
+						serverStatsLabels := e.buildLabelValues(serverID, "server", sgChain)
+						e.topologyNodeState.WithLabelValues(serverStatsLabels...).Set(value)
+
+						if requests, err := strconv.ParseFloat(s.TotalRequests, 64); err == nil {
+							e.topologyNodeRequestsTotal.WithLabelValues(serverStatsLabels...).Set(requests)
+						}
+						if conns, err := strconv.ParseFloat(s.CurrentServerConnections, 64); err == nil {
+							e.topologyNodeConnections.WithLabelValues(serverStatsLabels...).Set(conns)
+						}
+						if ttfb, err := strconv.ParseFloat(s.AvgTimeToFirstByte, 64); err == nil {
+							e.topologyNodeTTFBMs.WithLabelValues(serverStatsLabels...).Set(ttfb)
+						}
+					}
+				}
+
+				// Emit servicegroup topology node and stats (aggregated from members)
+				if !e.config.IsModuleDisabled("topology") && sgMemberCount > 0 {
+					// State: 1 if all members are UP, 0 otherwise
+					sgState := 0.0
+					sgStateStr := "DOWN"
+					if sgUpCount == sgMemberCount {
+						sgState = 1.0
+						sgStateStr = "UP"
+					}
+
+					// Calculate average TTFB for mainStat
+					avgTTFB := ""
+					if sgMemberCount > 0 {
+						avgTTFB = strconv.FormatFloat(sgTotalTTFB/float64(sgMemberCount), 'f', 1, 64)
+					}
+
+					// Create servicegroup topology node with stats
+					// mainStat = avg TTFB (ms), secondaryStat = "" for now
+					nodeLabels := e.buildLabelValues(sgNodeID, sgName, "servicegroup", sgStateStr, sgChain, avgTTFB, "")
+					e.topologyNode.WithLabelValues(nodeLabels...).Set(sgState)
+
+					// Also emit separate stats metrics
+					sgStatsLabels := e.buildLabelValues(sgNodeID, "servicegroup", sgChain)
+					e.topologyNodeState.WithLabelValues(sgStatsLabels...).Set(sgState)
+					e.topologyNodeRequestsTotal.WithLabelValues(sgStatsLabels...).Set(sgTotalRequests)
+					if sgMemberCount > 0 {
+						e.topologyNodeTTFBMs.WithLabelValues(sgStatsLabels...).Set(sgTotalTTFB / float64(sgMemberCount))
 					}
 				}
 			}()
@@ -566,6 +625,11 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 	if !e.config.IsModuleDisabled("topology") {
 		e.topologyNode.Collect(ch)
 		e.topologyEdge.Collect(ch)
+		e.topologyNodeState.Collect(ch)
+		e.topologyNodeHealth.Collect(ch)
+		e.topologyNodeRequestsTotal.Collect(ch)
+		e.topologyNodeConnections.Collect(ch)
+		e.topologyNodeTTFBMs.Collect(ch)
 	}
 }
 

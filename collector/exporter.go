@@ -166,6 +166,13 @@ type Exporter struct {
 	topologyNode *prometheus.GaugeVec
 	topologyEdge *prometheus.GaugeVec
 
+	// Topology node stats (for node graph visualization)
+	topologyNodeState        *prometheus.GaugeVec
+	topologyNodeHealth       *prometheus.GaugeVec
+	topologyNodeRequestsTotal *prometheus.GaugeVec
+	topologyNodeConnections  *prometheus.GaugeVec
+	topologyNodeTTFBMs       *prometheus.GaugeVec
+
 	// Protocol HTTP metrics
 	httpTotalRequests              *prometheus.Desc
 	httpTotalResponses             *prometheus.Desc
@@ -359,8 +366,9 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 	sgLabels := append(baseLabels, "servicegroup", "member", "port")
 	ifLabels := append(baseLabels, "interface", "alias")
 	vpnVsLabels := append(baseLabels, "vpn_virtual_server")
-	topoNodeLabels := append(baseLabels, "id", "title", "node_type", "state", "chain")
+	topoNodeLabels := append(baseLabels, "id", "title", "node_type", "state", "chain", "mainStat", "secondaryStat")
 	topoEdgeLabels := append(baseLabels, "id", "source", "target", "weight", "priority", "chain")
+	topoNodeStatsLabels := append(baseLabels, "id", "node_type", "chain")
 	sslCertLabels := append(baseLabels, "certkey")
 	sslVsLabels := append(baseLabels, "vserver", "type", "ip")
 	cpuCoreLabels := append(baseLabels, "core_id")
@@ -517,6 +525,13 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		// Topology metrics
 		topologyNode: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node", Help: "Node for topology visualization"}, topoNodeLabels),
 		topologyEdge: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_edge", Help: "Edge between frontend and backend"}, topoEdgeLabels),
+
+		// Topology node stats (for node graph visualization)
+		topologyNodeState:         prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_state", Help: "Node state (1=UP, 0=DOWN)"}, topoNodeStatsLabels),
+		topologyNodeHealth:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_health", Help: "Node health percentage (0-100)"}, topoNodeStatsLabels),
+		topologyNodeRequestsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_requests_total", Help: "Total requests processed by node"}, topoNodeStatsLabels),
+		topologyNodeConnections:   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_connections", Help: "Current client connections to node"}, topoNodeStatsLabels),
+		topologyNodeTTFBMs:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_ttfb_ms", Help: "Average time to first byte in milliseconds"}, topoNodeStatsLabels),
 
 		// Protocol HTTP metrics
 		httpTotalRequests:              prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_requests_total"), "Total HTTP requests", baseLabels, nil),
@@ -854,6 +869,11 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 	e.topologyNode.Describe(ch)
 	e.topologyEdge.Describe(ch)
+	e.topologyNodeState.Describe(ch)
+	e.topologyNodeHealth.Describe(ch)
+	e.topologyNodeRequestsTotal.Describe(ch)
+	e.topologyNodeConnections.Describe(ch)
+	e.topologyNodeTTFBMs.Describe(ch)
 
 	// Protocol HTTP metrics
 	ch <- e.httpTotalRequests

@@ -69,21 +69,60 @@ local stateThresholds =
 // ============================================================================
 // Topology Row
 // ============================================================================
+
+// The node graph panel requires:
+// - Nodes frame: must have 'id' field, optionally 'title', 'mainStat', 'secondaryStat'
+// - Edges frame: must have 'source' and 'target' fields
+//
+// Stats are emitted directly as string labels on topology_node, then converted to numbers.
+// LB vserver: mainStat=health%, secondaryStat=connections
+// CS vserver: mainStat="", secondaryStat=connections
+// ServiceGroup: mainStat=avgTTFB, secondaryStat=""
+// Server: mainStat=TTFB, secondaryStat=connections
 local topologyGraph =
   nodeGraph.new('Chain Topology')
-  + nodeGraph.panelOptions.withDescription('Routing topology: CS vServer -> LB vServer -> Service Group -> Server')
+  + nodeGraph.panelOptions.withDescription('Routing topology: CS vServer -> LB vServer -> Service Group -> Server. LB shows health %, servers show TTFB (ms).')
   + nodeGraph.queryOptions.withTargets([
-    // Nodes query
+    // Nodes query - base topology info with mainStat/secondaryStat as string labels
     promQuery('netscaler_topology_node{chain=~"$chain"}', '')
-    + { format: 'table', instant: true },
+    + { format: 'table', instant: true, refId: 'nodes' },
     // Edges query
     promQuery('netscaler_topology_edge{chain=~"$chain"}', '')
-    + { format: 'table', instant: true },
+    + { format: 'table', instant: true, refId: 'edges' },
+  ])
+  + nodeGraph.queryOptions.withTransformations([
+    // Convert mainStat and secondaryStat from strings to numbers
+    {
+      id: 'convertFieldType',
+      options: {
+        conversions: [
+          { targetField: 'mainStat', destinationType: 'number' },
+          { targetField: 'secondaryStat', destinationType: 'number' },
+        ],
+      },
+    },
+    // Clean up unnecessary fields
+    {
+      id: 'organize',
+      options: {
+        excludeByName: {
+          Time: true,
+          __name__: true,
+          instance: true,
+          job: true,
+          netscaler: true,
+          Value: true,
+        },
+      },
+    },
   ])
   + {
     options: {
       edges: {},
-      nodes: {},
+      nodes: {
+        mainStatUnit: 'short',
+        secondaryStatUnit: 'short',
+      },
       layoutAlgorithm: 'layered',
       zoomMode: 'cooperative',
     },
