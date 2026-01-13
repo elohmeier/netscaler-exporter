@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/elohmeier/netscaler-exporter/config"
+	"github.com/elohmeier/netscaler-exporter/netscaler"
 )
 
 // Exporter represents the metrics exported to Prometheus
@@ -23,6 +24,10 @@ type Exporter struct {
 
 	// Chain membership for topology filtering (nodeID → comma-separated chain names)
 	chainMembership map[string]string
+
+	// Persistent clients for session-based authentication
+	nsClient  *netscaler.NitroClient
+	mpsClient *netscaler.MPSClient
 
 	// System metrics (descriptors)
 	modelID                                *prometheus.Desc
@@ -666,6 +671,21 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		mpsHealthMemoryUsage: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_memory_usage", Help: "MPS memory usage percentage"}, mpsHealthLabels),
 		mpsHealthMemoryFree:  prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_memory_free_bytes", Help: "MPS memory free in bytes"}, mpsHealthLabels),
 		mpsHealthMemoryTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "mps_health_memory_total_bytes", Help: "MPS memory total in bytes"}, mpsHealthLabels),
+	}
+
+	// Create persistent clients based on target type
+	if targetType == "adc" {
+		nsClient, err := netscaler.NewNitroClient(url, username, password, ignoreCert, caFile, logger)
+		if err != nil {
+			return nil, err
+		}
+		e.nsClient = nsClient
+	} else if targetType == "mps" {
+		mpsClient, err := netscaler.NewMPSClient(url, username, password, ignoreCert, caFile, logger)
+		if err != nil {
+			return nil, err
+		}
+		e.mpsClient = mpsClient
 	}
 
 	return e, nil

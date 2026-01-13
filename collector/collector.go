@@ -27,12 +27,8 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	nsClient, err := netscaler.NewNitroClient(e.url, e.username, e.password, e.ignoreCert, e.caFile)
-	if err != nil {
-		e.logger.Error("failed to create Nitro client", "url", e.url, "err", err)
-		return
-	}
-	defer nsClient.CloseIdleConnections()
+	// Use persistent client with session-based authentication
+	nsClient := e.nsClient
 
 	var wg sync.WaitGroup
 	// Semaphore to limit concurrent requests to avoid overloading the NetScaler
@@ -573,12 +569,8 @@ func (e *Exporter) scrapeMPS(ch chan<- prometheus.Metric) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	mpsClient, err := netscaler.NewMPSClient(e.url, e.username, e.password, e.ignoreCert, e.caFile)
-	if err != nil {
-		e.logger.Error("failed to create MPS client", "url", e.url, "err", err)
-		return
-	}
-	defer mpsClient.CloseIdleConnections()
+	// Use persistent client with session-based authentication
+	mpsClient := e.mpsClient
 
 	// MPS Health stats
 	mpsHealth, err := netscaler.GetMPSHealth(ctx, mpsClient)
