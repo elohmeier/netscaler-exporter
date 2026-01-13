@@ -555,6 +555,11 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.collectNSCapacityStats(ctx, nsClient, ch)
 	})
 
+	// 21. HA (High Availability) Stats
+	run("ha_stats", func() {
+		e.collectHAStats(ctx, nsClient, ch)
+	})
+
 	wg.Wait()
 
 	// Collect topology metrics after all modules have added their nodes/edges

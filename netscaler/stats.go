@@ -274,3 +274,33 @@ func GetSystemCPUStats(ctx context.Context, c *NitroClient, querystring string) 
 func GetNSCapacityStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
 	return getStats(ctx, c, "nscapacity", querystring)
 }
+
+// GetHANodeConfig queries the Nitro API for HA node configuration
+func GetHANodeConfig(ctx context.Context, c *NitroClient) (HANodeConfigResponse, error) {
+	data, err := c.GetConfig(ctx, "hanode", "")
+	if err != nil {
+		return HANodeConfigResponse{}, err
+	}
+
+	var response HANodeConfigResponse
+	if err = json.Unmarshal(data, &response); err != nil {
+		return HANodeConfigResponse{}, fmt.Errorf("error unmarshalling hanode config response: %w", err)
+	}
+
+	return response, nil
+}
+
+// GetHANodeStats queries the Nitro API for HA node statistics
+func GetHANodeStats(ctx context.Context, c *NitroClient) (HANodeStatsResponse, error) {
+	data, err := c.GetStats(ctx, "hanode", "")
+	if err != nil {
+		return HANodeStatsResponse{}, err
+	}
+
+	var response HANodeStatsResponse
+	if err = json.Unmarshal(data, &response); err != nil {
+		return HANodeStatsResponse{}, fmt.Errorf("error unmarshalling hanode stats response: %w", err)
+	}
+
+	return response, nil
+}

@@ -498,3 +498,43 @@ type CSPolicyResponse struct {
 type CSActionResponse struct {
 	CSActions []CSAction `json:"csaction,omitempty"`
 }
+
+// HANodeConfig represents the data returned from the /config/hanode Nitro API endpoint
+type HANodeConfig struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	IPAddress       string `json:"ipaddress"`
+	State           string `json:"state"`           // Primary/Secondary
+	HAStatus        string `json:"hastatus"`        // UP/DOWN
+	HASync          string `json:"hasync"`          // ENABLED/SUCCESS/DISABLED
+	HAProp          string `json:"haprop"`          // ENABLED/DISABLED
+	MasterStateTime int64  `json:"masterstatetime"` // seconds in current state
+}
+
+// HANodeConfigResponse for hanode config response
+type HANodeConfigResponse struct {
+	Errorcode int64          `json:"errorcode"`
+	Message   string         `json:"message"`
+	HANodes   []HANodeConfig `json:"hanode,omitempty"`
+}
+
+// HANodeStats represents the data returned from the /stat/hanode Nitro API endpoint
+type HANodeStats struct {
+	HACurMasterState string `json:"hacurmasterstate"` // Primary/Secondary
+	HACurState       string `json:"hacurstate"`       // UP/DOWN
+	HACurStatus      string `json:"hacurstatus"`      // YES/NO
+	HATotPktRx       string `json:"hatotpktrx"`       // Total packets received
+	HATotPktTx       string `json:"hatotpkttx"`       // Total packets transmitted
+	HAPktRxRate      int64  `json:"hapktrxrate"`      // Packets received rate
+	HAPktTxRate      int64  `json:"hapkttxrate"`      // Packets transmitted rate
+	HAErrSyncFailure string `json:"haerrsyncfailure"` // Sync failure count
+	HAErrPropTimeout string `json:"haerrproptimeout"` // Propagation timeout count
+	TransTime        string `json:"transtime"`        // Last transition time
+}
+
+// HANodeStatsResponse for hanode stat response
+type HANodeStatsResponse struct {
+	Errorcode int64       `json:"errorcode"`
+	Message   string      `json:"message"`
+	HANode    HANodeStats `json:"hanode"`
+}
