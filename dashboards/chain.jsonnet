@@ -70,59 +70,31 @@ local stateThresholds =
 // Topology Row
 // ============================================================================
 
-// The node graph panel requires:
-// - Nodes frame: must have 'id' field, optionally 'title', 'mainStat', 'secondaryStat'
-// - Edges frame: must have 'source' and 'target' fields
+// The node graph panel uses:
+// - 'id' for node identification
+// - 'title' for display name
+// - 'subtitle' for descriptive stats shown below the title
 //
-// Stats are emitted directly as string labels on topology_node, then converted to numbers.
-// LB vserver: mainStat=health%, secondaryStat=connections
-// CS vserver: mainStat="", secondaryStat=connections
-// ServiceGroup: mainStat=avgTTFB, secondaryStat=""
-// Server: mainStat=TTFB, secondaryStat=connections
+// Subtitle content by node type:
+// - LB vserver: "Health: X%, Conns: Y"
+// - CS vserver: "Conns: Y"
+// - ServiceGroup: "Avg TTFB: Xms, Members: Y/Z"
+// - Server: "TTFB: Xms, Conns: Y"
 local topologyGraph =
   nodeGraph.new('Chain Topology')
-  + nodeGraph.panelOptions.withDescription('Routing topology: CS vServer -> LB vServer -> Service Group -> Server. LB shows health %, servers show TTFB (ms).')
+  + nodeGraph.panelOptions.withDescription('Routing topology: CS vServer -> LB vServer -> Service Group -> Server')
   + nodeGraph.queryOptions.withTargets([
-    // Nodes query - base topology info with mainStat/secondaryStat as string labels
+    // Nodes query
     promQuery('netscaler_topology_node{chain=~"$chain"}', '')
     + { format: 'table', instant: true, refId: 'nodes' },
     // Edges query
     promQuery('netscaler_topology_edge{chain=~"$chain"}', '')
     + { format: 'table', instant: true, refId: 'edges' },
   ])
-  + nodeGraph.queryOptions.withTransformations([
-    // Convert mainStat and secondaryStat from strings to numbers
-    {
-      id: 'convertFieldType',
-      options: {
-        conversions: [
-          { targetField: 'mainStat', destinationType: 'number' },
-          { targetField: 'secondaryStat', destinationType: 'number' },
-        ],
-      },
-    },
-    // Clean up unnecessary fields
-    {
-      id: 'organize',
-      options: {
-        excludeByName: {
-          Time: true,
-          __name__: true,
-          instance: true,
-          job: true,
-          netscaler: true,
-          Value: true,
-        },
-      },
-    },
-  ])
   + {
     options: {
       edges: {},
-      nodes: {
-        mainStatUnit: 'short',
-        secondaryStatUnit: 'short',
-      },
+      nodes: {},
       layoutAlgorithm: 'layered',
       zoomMode: 'cooperative',
     },

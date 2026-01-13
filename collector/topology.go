@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -150,17 +151,21 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 			nodeID := "lbvserver:" + vs.Name
 			state := "DOWN"
 			value := 0.0
+			color := "red"
 			if vs.State == "UP" {
 				state = "UP"
 				value = 1.0
+				color = "green"
 			}
 			chain := e.chainMembership[nodeID]
 
-			// mainStat = health %, secondaryStat = connections
-			mainStat := vs.Health
-			secondaryStat := vs.CurrentClientConnections
+			// subtitle shows health and connections
+			subtitle := fmt.Sprintf("Health: %s%%, Conns: %s", vs.Health, vs.CurrentClientConnections)
 
-			labels := e.buildLabelValues(nodeID, vs.Name, "lbvserver", state, chain, mainStat, secondaryStat)
+			// Node graph fields: mainstat=health, secondarystat=connections
+			labels := e.buildLabelValues(nodeID, vs.Name, subtitle, "lbvserver", state, chain,
+				vs.Health, vs.CurrentClientConnections, color,
+				vs.Health, vs.CurrentClientConnections, vs.TotalRequests, "")
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 
 			// Emit topology node stats
@@ -188,17 +193,21 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 			nodeID := "csvserver:" + vs.Name
 			state := "DOWN"
 			value := 0.0
+			color := "red"
 			if vs.State == "UP" {
 				state = "UP"
 				value = 1.0
+				color = "green"
 			}
 			chain := e.chainMembership[nodeID]
 
-			// CS vservers: mainStat = "" (no health), secondaryStat = connections
-			mainStat := ""
-			secondaryStat := vs.CurrentClientConnections
+			// subtitle shows connections
+			subtitle := fmt.Sprintf("Conns: %s", vs.CurrentClientConnections)
 
-			labels := e.buildLabelValues(nodeID, vs.Name, "csvserver", state, chain, mainStat, secondaryStat)
+			// Node graph fields: mainstat=connections, secondarystat=hits
+			labels := e.buildLabelValues(nodeID, vs.Name, subtitle, "csvserver", state, chain,
+				vs.CurrentClientConnections, vs.TotalHits, color,
+				"", vs.CurrentClientConnections, vs.TotalHits, "")
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 
 			// Emit topology node stats (CS vservers use total_hits as main stat)
@@ -223,14 +232,18 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 			nodeID := "service:" + svc.Name
 			state := "DOWN"
 			value := 0.0
+			color := "red"
 			if svc.State == "UP" {
 				state = "UP"
 				value = 1.0
+				color = "green"
 			}
 			chain := e.chainMembership[nodeID]
 
-			// Services: mainStat = "", secondaryStat = ""
-			labels := e.buildLabelValues(nodeID, svc.Name, "service", state, chain, "", "")
+			// Services: limited stats available
+			labels := e.buildLabelValues(nodeID, svc.Name, "", "service", state, chain,
+				"", "", color,
+				"", "", "", "")
 			e.topologyNode.WithLabelValues(labels...).Set(value)
 		}
 	}
@@ -252,7 +265,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				if weight == "" {
 					weight = "1"
 				}
-				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "", sourceChain)
+				mainstat := "weight: " + weight
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "", sourceChain, mainstat, "")
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 
@@ -264,7 +278,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				if weight == "" {
 					weight = "1"
 				}
-				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "", sourceChain)
+				mainstat := "weight: " + weight
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, weight, "", sourceChain, mainstat, "")
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 		}
@@ -283,7 +298,8 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 				if priority == "" {
 					priority = "0"
 				}
-				labels := e.buildLabelValues(edgeID, sourceID, targetID, "", priority, sourceChain)
+				mainstat := "priority: " + priority
+				labels := e.buildLabelValues(edgeID, sourceID, targetID, "", priority, sourceChain, mainstat, "")
 				e.topologyEdge.WithLabelValues(labels...).Set(1)
 			}
 		}

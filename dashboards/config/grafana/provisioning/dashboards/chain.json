@@ -19,7 +19,7 @@
             "type": "datasource",
             "uid": "-- Mixed --"
          },
-         "description": "Routing topology: CS vServer -> LB vServer -> Service Group -> Server. LB shows health %, servers show TTFB (ms).",
+         "description": "Routing topology: CS vServer -> LB vServer -> Service Group -> Server",
          "gridPos": {
             "h": 25,
             "w": 24,
@@ -30,10 +30,7 @@
          "options": {
             "edges": { },
             "layoutAlgorithm": "layered",
-            "nodes": {
-               "mainStatUnit": "short",
-               "secondaryStatUnit": "short"
-            },
+            "nodes": { },
             "zoomMode": "cooperative"
          },
          "pluginVersion": "v11.4.0",
@@ -62,36 +59,6 @@
             }
          ],
          "title": "Chain Topology",
-         "transformations": [
-            {
-               "id": "convertFieldType",
-               "options": {
-                  "conversions": [
-                     {
-                        "destinationType": "number",
-                        "targetField": "mainStat"
-                     },
-                     {
-                        "destinationType": "number",
-                        "targetField": "secondaryStat"
-                     }
-                  ]
-               }
-            },
-            {
-               "id": "organize",
-               "options": {
-                  "excludeByName": {
-                     "Time": true,
-                     "Value": true,
-                     "__name__": true,
-                     "instance": true,
-                     "job": true,
-                     "netscaler": true
-                  }
-               }
-            }
-         ],
          "type": "nodeGraph"
       },
       {

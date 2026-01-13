@@ -494,18 +494,24 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 						serverTitle := fmt.Sprintf("%s:%d", memberName, s.PrimaryPort)
 						topoState := "DOWN"
 						value := 0.0
+						color := "red"
 						if s.State == "UP" {
 							topoState = "UP"
 							value = 1.0
+							color = "green"
 						}
 						// Server inherits chain from its parent servicegroup
-						// mainStat = TTFB (ms), secondaryStat = connections
-						nodeLabels := e.buildLabelValues(serverID, serverTitle, "server", topoState, sgChain, s.AvgTimeToFirstByte, s.CurrentServerConnections)
+						// subtitle shows TTFB and connections
+						subtitle := fmt.Sprintf("TTFB: %sms, Conns: %s", s.AvgTimeToFirstByte, s.CurrentServerConnections)
+						// Node graph: mainstat=TTFB, secondarystat=connections
+						nodeLabels := e.buildLabelValues(serverID, serverTitle, subtitle, "server", topoState, sgChain,
+							s.AvgTimeToFirstByte, s.CurrentServerConnections, color,
+							"", s.CurrentServerConnections, s.TotalRequests, s.AvgTimeToFirstByte)
 						e.topologyNode.WithLabelValues(nodeLabels...).Set(value)
 
 						edgeID := fmt.Sprintf("servicegroup:%s->server:%s:%d", sgName, s.PrimaryIPAddress, s.PrimaryPort)
 						sourceID := "servicegroup:" + sgName
-						edgeLabels := e.buildLabelValues(edgeID, sourceID, serverID, "1", "", sgChain)
+						edgeLabels := e.buildLabelValues(edgeID, sourceID, serverID, "1", "", sgChain, "", "")
 						e.topologyEdge.WithLabelValues(edgeLabels...).Set(1)
 
 						// Emit topology node stats for server
@@ -529,20 +535,28 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 					// State: 1 if all members are UP, 0 otherwise
 					sgState := 0.0
 					sgStateStr := "DOWN"
+					color := "red"
 					if sgUpCount == sgMemberCount {
 						sgState = 1.0
 						sgStateStr = "UP"
+						color = "green"
 					}
 
-					// Calculate average TTFB for mainStat
-					avgTTFB := ""
+					// subtitle shows avg TTFB and member count
+					var subtitle string
+					var avgTTFBStr string
 					if sgMemberCount > 0 {
-						avgTTFB = strconv.FormatFloat(sgTotalTTFB/float64(sgMemberCount), 'f', 1, 64)
+						avgTTFB := sgTotalTTFB / float64(sgMemberCount)
+						subtitle = fmt.Sprintf("Avg TTFB: %.1fms, Members: %d/%d", avgTTFB, sgUpCount, sgMemberCount)
+						avgTTFBStr = fmt.Sprintf("%.1f", avgTTFB)
 					}
 
-					// Create servicegroup topology node with stats
-					// mainStat = avg TTFB (ms), secondaryStat = "" for now
-					nodeLabels := e.buildLabelValues(sgNodeID, sgName, "servicegroup", sgStateStr, sgChain, avgTTFB, "")
+					// Node graph: mainstat=members UP, secondarystat=avg TTFB
+					membersStr := fmt.Sprintf("%d/%d", sgUpCount, sgMemberCount)
+					requestsStr := fmt.Sprintf("%.0f", sgTotalRequests)
+					nodeLabels := e.buildLabelValues(sgNodeID, sgName, subtitle, "servicegroup", sgStateStr, sgChain,
+						membersStr, avgTTFBStr, color,
+						"", "", requestsStr, avgTTFBStr)
 					e.topologyNode.WithLabelValues(nodeLabels...).Set(sgState)
 
 					// Also emit separate stats metrics

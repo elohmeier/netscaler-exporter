@@ -366,8 +366,11 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 	sgLabels := append(baseLabels, "servicegroup", "member", "port")
 	ifLabels := append(baseLabels, "interface", "alias")
 	vpnVsLabels := append(baseLabels, "vpn_virtual_server")
-	topoNodeLabels := append(baseLabels, "id", "title", "node_type", "state", "chain", "mainStat", "secondaryStat")
-	topoEdgeLabels := append(baseLabels, "id", "source", "target", "weight", "priority", "chain")
+	topoNodeLabels := append(baseLabels, "id", "title", "subtitle", "node_type", "state", "chain",
+		"mainstat", "secondarystat", "color",
+		"detail__health", "detail__connections", "detail__requests", "detail__ttfb")
+	topoEdgeLabels := append(baseLabels, "id", "source", "target", "weight", "priority", "chain",
+		"mainstat", "secondarystat")
 	topoNodeStatsLabels := append(baseLabels, "id", "node_type", "chain")
 	sslCertLabels := append(baseLabels, "certkey")
 	sslVsLabels := append(baseLabels, "vserver", "type", "ip")
