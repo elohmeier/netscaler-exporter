@@ -32,6 +32,7 @@ type MPSClient struct {
 // Uses session-based authentication with automatic re-login on session expiration.
 func NewMPSClient(url string, username string, password string, ignoreCert bool, caFile string, logger *slog.Logger) (*MPSClient, error) {
 	transport := &http.Transport{
+		Proxy:               http.ProxyFromEnvironment,
 		MaxIdleConns:        20,
 		MaxIdleConnsPerHost: 20,
 		IdleConnTimeout:     30 * time.Second,

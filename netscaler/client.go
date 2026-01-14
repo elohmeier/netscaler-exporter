@@ -40,6 +40,7 @@ type NitroClient struct {
 // If ignoreCert is true, TLS verification is skipped entirely.
 func NewNitroClient(url string, username string, password string, ignoreCert bool, caFile string, logger *slog.Logger) (*NitroClient, error) {
 	transport := &http.Transport{
+		Proxy:               http.ProxyFromEnvironment,
 		MaxIdleConns:        20,
 		MaxIdleConnsPerHost: 20,
 		IdleConnTimeout:     30 * time.Second,
