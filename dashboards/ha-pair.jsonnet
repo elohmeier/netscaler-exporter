@@ -14,19 +14,34 @@ local datasource =
   var.datasource.new('datasource', 'prometheus')
   + var.datasource.generalOptions.withLabel('Data source');
 
-local netscaler =
-  var.query.new('netscaler')
+local environment =
+  var.query.new('environment')
   + var.query.withDatasourceFromVariable(datasource)
-  + var.query.queryTypes.withLabelValues('netscaler', 'netscaler_ha_cur_state')
+  + var.query.queryTypes.withLabelValues('deployment_environment_name', 'netscaler_ha_cur_state')
+  + var.query.withRefresh('time')
+  + var.query.generalOptions.withLabel('Environment');
+
+local netscalerCluster =
+  var.query.new('netscaler_cluster')
+  + var.query.withDatasourceFromVariable(datasource)
+  + var.query.queryTypes.withLabelValues('netscaler_cluster', 'netscaler_ha_cur_state{deployment_environment_name=~"$environment"}')
+  + var.query.withRefresh('time')
+  + var.query.generalOptions.withLabel('Cluster');
+
+local hostName =
+  var.query.new('host_name')
+  + var.query.withDatasourceFromVariable(datasource)
+  + var.query.queryTypes.withLabelValues('host_name', 'netscaler_ha_cur_state{deployment_environment_name=~"$environment",netscaler_cluster=~"$netscaler_cluster"}')
   + var.query.withRefresh('time')
   + var.query.selectionOptions.withMulti(true)
   + var.query.selectionOptions.withIncludeAll(true)
-  + var.query.generalOptions.withLabel('NetScaler');
+  + var.query.generalOptions.withLabel('Host');
 
 // Helper for prometheus queries
 local promQuery(expr, legend='') =
   g.query.prometheus.new('$datasource', expr)
-  + g.query.prometheus.withLegendFormat(legend);
+  + g.query.prometheus.withLegendFormat(legend)
+  + g.query.prometheus.withInterval('1m');
 
 // State value mapping (0=DOWN, 1=UP)
 local stateMapping = [
@@ -68,7 +83,7 @@ local certThresholds =
 // ============================================================================
 local haClusterState =
   stat.new('HA Cluster State')
-  + stat.queryOptions.withTargets([promQuery('netscaler_ha_cur_state{netscaler=~"$netscaler"}', '{{netscaler}}')])
+  + stat.queryOptions.withTargets([promQuery('netscaler_ha_cur_state{host_name=~"$host_name"}', '{{host_name}}')])
   + stat.standardOptions.withMappings(stateMapping)
   + stateThresholds
   + stat.options.withColorMode('background')
@@ -78,11 +93,11 @@ local haClusterState =
 local haNodeTable =
   table.new('HA Node States')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_ha_node_state{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_ha_node_state{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'A' },
-    promQuery('netscaler_ha_node_status{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_ha_node_status{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'B' },
-    promQuery('netscaler_ha_node_sync_state{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_ha_node_sync_state{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'C' },
   ])
   + table.queryOptions.withTransformations([
@@ -91,29 +106,15 @@ local haNodeTable =
       options: { byField: 'node_id', mode: 'outer' },
     },
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(node_id|node_ip|node_name|Value #[ABC])( [0-9]+)?$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
         excludeByName: {
-          Time: true,
-          'Time 1': true,
-          'Time 2': true,
-          'Time 3': true,
-          __name__: true,
-          '__name__ 1': true,
-          '__name__ 2': true,
-          '__name__ 3': true,
-          instance: true,
-          'instance 1': true,
-          'instance 2': true,
-          'instance 3': true,
-          job: true,
-          'job 1': true,
-          'job 2': true,
-          'job 3': true,
-          netscaler: true,
-          'netscaler 1': true,
-          'netscaler 2': true,
-          'netscaler 3': true,
           'node_ip 1': true,
           'node_ip 2': true,
           'node_name 1': true,
@@ -146,14 +147,14 @@ local haNodeTable =
 
 local haMasterDuration =
   stat.new('Master State Duration')
-  + stat.queryOptions.withTargets([promQuery('netscaler_ha_node_master_state_seconds{netscaler=~"$netscaler",node_id="0"}', '{{node_name}}')])
+  + stat.queryOptions.withTargets([promQuery('netscaler_ha_node_master_state_seconds{host_name=~"$host_name",node_id="0"}', '{{node_name}}')])
   + stat.standardOptions.withUnit('s')
   + stat.options.withColorMode('none')
   + { gridPos: { w: 3, h: 4, x: 3, y: 1 } };
 
 local haSyncFailures =
   stat.new('Sync Failures')
-  + stat.queryOptions.withTargets([promQuery('netscaler_ha_sync_failures_total{netscaler=~"$netscaler"}', '{{netscaler}}')])
+  + stat.queryOptions.withTargets([promQuery('netscaler_ha_sync_failures_total{host_name=~"$host_name"}', '{{host_name}}')])
   + stat.standardOptions.thresholds.withMode('absolute')
   + stat.standardOptions.thresholds.withSteps([
     { color: 'green', value: null },
@@ -172,7 +173,7 @@ local haRow =
 // ============================================================================
 local certExpiringSoon =
   stat.new('Expiring < 30 days')
-  + stat.queryOptions.withTargets([promQuery('count(netscaler_ssl_cert_days_to_expire{netscaler=~"$netscaler"} < 30) or vector(0)', '')])
+  + stat.queryOptions.withTargets([promQuery('count(netscaler_ssl_cert_days_to_expire{host_name=~"$host_name"} < 30) or vector(0)', '')])
   + stat.standardOptions.thresholds.withMode('absolute')
   + stat.standardOptions.thresholds.withSteps([
     { color: 'green', value: null },
@@ -183,7 +184,7 @@ local certExpiringSoon =
 
 local certCritical =
   stat.new('Critical < 7 days')
-  + stat.queryOptions.withTargets([promQuery('count(netscaler_ssl_cert_days_to_expire{netscaler=~"$netscaler"} < 7) or vector(0)', '')])
+  + stat.queryOptions.withTargets([promQuery('count(netscaler_ssl_cert_days_to_expire{host_name=~"$host_name"} < 7) or vector(0)', '')])
   + stat.standardOptions.thresholds.withMode('absolute')
   + stat.standardOptions.thresholds.withSteps([
     { color: 'green', value: null },
@@ -195,14 +196,19 @@ local certCritical =
 local certTable =
   table.new('SSL Certificate Expiry')
   + table.queryOptions.withTargets([
-    promQuery('sort(netscaler_ssl_cert_days_to_expire{netscaler=~"$netscaler"})', '')
+    promQuery('sort(netscaler_ssl_cert_days_to_expire{host_name=~"$host_name"})', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(certkey|Value)$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: { Time: true, __name__: true, instance: true, job: true, netscaler: true },
         renameByName: { certkey: 'Certificate', Value: 'Days to Expire' },
       },
     },
@@ -241,7 +247,7 @@ local sslRow =
 // ============================================================================
 local mgmtCpu =
   gauge.new('Management CPU')
-  + gauge.queryOptions.withTargets([promQuery('netscaler_mgmt_cpu_usage{netscaler=~"$netscaler"}', '{{netscaler}}')])
+  + gauge.queryOptions.withTargets([promQuery('netscaler_mgmt_cpu_usage{host_name=~"$host_name"}', '{{host_name}}')])
   + gauge.standardOptions.withUnit('percent')
   + gauge.standardOptions.withMin(0) + gauge.standardOptions.withMax(100)
   + percentThresholds
@@ -249,7 +255,7 @@ local mgmtCpu =
 
 local pktCpu =
   gauge.new('Packet CPU')
-  + gauge.queryOptions.withTargets([promQuery('netscaler_pkt_cpu_usage{netscaler=~"$netscaler"}', '{{netscaler}}')])
+  + gauge.queryOptions.withTargets([promQuery('netscaler_pkt_cpu_usage{host_name=~"$host_name"}', '{{host_name}}')])
   + gauge.standardOptions.withUnit('percent')
   + gauge.standardOptions.withMin(0) + gauge.standardOptions.withMax(100)
   + percentThresholds
@@ -257,7 +263,7 @@ local pktCpu =
 
 local memUsage =
   gauge.new('Memory Usage')
-  + gauge.queryOptions.withTargets([promQuery('netscaler_mem_usage{netscaler=~"$netscaler"}', '{{netscaler}}')])
+  + gauge.queryOptions.withTargets([promQuery('netscaler_mem_usage{host_name=~"$host_name"}', '{{host_name}}')])
   + gauge.standardOptions.withUnit('percent')
   + gauge.standardOptions.withMin(0) + gauge.standardOptions.withMax(100)
   + percentThresholds
@@ -265,7 +271,7 @@ local memUsage =
 
 local cpuCores =
   timeSeries.new('CPU Usage per Core')
-  + timeSeries.queryOptions.withTargets([promQuery('netscaler_cpu_core_usage_percent{netscaler=~"$netscaler"}', 'Core {{core_id}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('netscaler_cpu_core_usage_percent{host_name=~"$host_name"}', '{{host_name}} Core {{core_id}}')])
   + timeSeries.standardOptions.withUnit('percent')
   + timeSeries.standardOptions.withMin(0) + timeSeries.standardOptions.withMax(100)
   + { gridPos: { w: 12, h: 6, x: 12, y: 15 } };
@@ -280,23 +286,23 @@ local systemRow =
 local interfaceTraffic =
   timeSeries.new('Interface Traffic')
   + timeSeries.queryOptions.withTargets([
-    promQuery('rate(netscaler_interfaces_received_bytes{netscaler=~"$netscaler"}[$__rate_interval])', '{{interface}} RX'),
-    promQuery('rate(netscaler_interfaces_transmitted_bytes{netscaler=~"$netscaler"}[$__rate_interval])', '{{interface}} TX'),
+    promQuery('rate(netscaler_interfaces_received_bytes{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} RX'),
+    promQuery('rate(netscaler_interfaces_transmitted_bytes{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} TX'),
   ])
   + timeSeries.standardOptions.withUnit('Bps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
 
 local interfaceErrors =
   timeSeries.new('Interface Errors')
-  + timeSeries.queryOptions.withTargets([promQuery('rate(netscaler_interfaces_error_packets_received{netscaler=~"$netscaler"}[$__rate_interval])', '{{interface}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('rate(netscaler_interfaces_error_packets_received{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}}')])
   + timeSeries.standardOptions.withUnit('pps')
   + timeSeries.gridPos.withW(6) + timeSeries.gridPos.withH(6);
 
 local interfaceJumbo =
   timeSeries.new('Jumbo Packets')
   + timeSeries.queryOptions.withTargets([
-    promQuery('rate(netscaler_interfaces_jumbo_packets_received{netscaler=~"$netscaler"}[$__rate_interval])', '{{interface}} RX'),
-    promQuery('rate(netscaler_interfaces_jumbo_packets_transmitted{netscaler=~"$netscaler"}[$__rate_interval])', '{{interface}} TX'),
+    promQuery('rate(netscaler_interfaces_jumbo_packets_received{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} RX'),
+    promQuery('rate(netscaler_interfaces_jumbo_packets_transmitted{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} TX'),
   ])
   + timeSeries.standardOptions.withUnit('pps')
   + timeSeries.gridPos.withW(6) + timeSeries.gridPos.withH(6);
@@ -312,8 +318,8 @@ local interfacesRow =
 local ipTraffic =
   timeSeries.new('IP Traffic')
   + timeSeries.queryOptions.withTargets([
-    promQuery('netscaler_ip_rx_mbits_rate{netscaler=~"$netscaler"}', 'RX Mbps'),
-    promQuery('netscaler_ip_tx_mbits_rate{netscaler=~"$netscaler"}', 'TX Mbps'),
+    promQuery('netscaler_ip_rx_mbits_rate{host_name=~"$host_name"}', '{{host_name}} RX'),
+    promQuery('netscaler_ip_tx_mbits_rate{host_name=~"$host_name"}', '{{host_name}} TX'),
   ])
   + timeSeries.standardOptions.withUnit('Mbits')
   + timeSeries.standardOptions.withMin(0)
@@ -322,8 +328,8 @@ local ipTraffic =
 local httpRequests =
   timeSeries.new('HTTP Requests/Responses')
   + timeSeries.queryOptions.withTargets([
-    promQuery('netscaler_http_requests_rate{netscaler=~"$netscaler"}', 'Requests'),
-    promQuery('netscaler_http_responses_rate{netscaler=~"$netscaler"}', 'Responses'),
+    promQuery('netscaler_http_requests_rate{host_name=~"$host_name"}', '{{host_name}} Requests'),
+    promQuery('netscaler_http_responses_rate{host_name=~"$host_name"}', '{{host_name}} Responses'),
   ])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.standardOptions.withMin(0)
@@ -332,9 +338,9 @@ local httpRequests =
 local httpMethods =
   pieChart.new('HTTP Methods')
   + pieChart.queryOptions.withTargets([
-    promQuery('netscaler_http_gets_total{netscaler=~"$netscaler"}', 'GET'),
-    promQuery('netscaler_http_posts_total{netscaler=~"$netscaler"}', 'POST'),
-    promQuery('netscaler_http_others_total{netscaler=~"$netscaler"}', 'Other'),
+    promQuery('sum(netscaler_http_gets_total{host_name=~"$host_name"})', 'GET'),
+    promQuery('sum(netscaler_http_posts_total{host_name=~"$host_name"})', 'POST'),
+    promQuery('sum(netscaler_http_others_total{host_name=~"$host_name"})', 'Other'),
   ])
   + pieChart.options.withDisplayLabels(['name', 'percent'])
   + pieChart.options.reduceOptions.withCalcs(['lastNotNull'])
@@ -355,9 +361,9 @@ local trafficRow =
 local httpErrors =
   timeSeries.new('HTTP Errors')
   + timeSeries.queryOptions.withTargets([
-    promQuery('rate(netscaler_http_err_server_busy_total{netscaler=~"$netscaler"}[$__rate_interval])', 'Server Busy'),
-    promQuery('rate(netscaler_http_err_incomplete_requests_total{netscaler=~"$netscaler"}[$__rate_interval])', 'Incomplete Requests'),
-    promQuery('rate(netscaler_http_err_incomplete_responses_total{netscaler=~"$netscaler"}[$__rate_interval])', 'Incomplete Responses'),
+    promQuery('rate(netscaler_http_err_server_busy_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} Server Busy'),
+    promQuery('rate(netscaler_http_err_incomplete_requests_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} Incomplete Requests'),
+    promQuery('rate(netscaler_http_err_incomplete_responses_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} Incomplete Responses'),
   ])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.gridPos.withW(8) + timeSeries.gridPos.withH(6);
@@ -365,16 +371,16 @@ local httpErrors =
 local ipErrors =
   timeSeries.new('IP Errors')
   + timeSeries.queryOptions.withTargets([
-    promQuery('rate(netscaler_ip_bad_checksums_total{netscaler=~"$netscaler"}[$__rate_interval])', 'Bad Checksums'),
-    promQuery('rate(netscaler_ip_ttl_expired_total{netscaler=~"$netscaler"}[$__rate_interval])', 'TTL Expired'),
-    promQuery('rate(netscaler_ip_truncated_packets_total{netscaler=~"$netscaler"}[$__rate_interval])', 'Truncated'),
+    promQuery('rate(netscaler_ip_bad_checksums_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} Bad Checksums'),
+    promQuery('rate(netscaler_ip_ttl_expired_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} TTL Expired'),
+    promQuery('rate(netscaler_ip_truncated_packets_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} Truncated'),
   ])
   + timeSeries.standardOptions.withUnit('pps')
   + timeSeries.gridPos.withW(8) + timeSeries.gridPos.withH(6);
 
 local tcpErrors =
   timeSeries.new('TCP Errors')
-  + timeSeries.queryOptions.withTargets([promQuery('netscaler_tcp_err_ip_port_fail{netscaler=~"$netscaler"}', 'IP Port Fail')])
+  + timeSeries.queryOptions.withTargets([promQuery('netscaler_tcp_err_ip_port_fail{host_name=~"$host_name"}', '{{host_name}} IP Port Fail')])
   + timeSeries.standardOptions.withUnit('short')
   + timeSeries.gridPos.withW(8) + timeSeries.gridPos.withH(6);
 
@@ -389,9 +395,9 @@ local errorsRow =
 local csStatesTable =
   table.new('CS Virtual Server States')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_cs_virtual_servers_state{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_cs_virtual_servers_state{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'A' },
-    promQuery('netscaler_cs_virtual_servers_total_hits{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_cs_virtual_servers_total_hits{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'B' },
   ])
   + table.queryOptions.withTransformations([
@@ -400,25 +406,14 @@ local csStatesTable =
       options: { byField: 'virtual_server', mode: 'outer' },
     },
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(virtual_server|Value #[AB])$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: {
-          Time: true,
-          'Time 1': true,
-          'Time 2': true,
-          __name__: true,
-          '__name__ 1': true,
-          '__name__ 2': true,
-          instance: true,
-          'instance 1': true,
-          'instance 2': true,
-          job: true,
-          'job 1': true,
-          'job 2': true,
-          netscaler: true,
-          'netscaler 1': true,
-          'netscaler 2': true,
-        },
         indexByName: {
           virtual_server: 0,
           'Value #A': 1,
@@ -441,6 +436,20 @@ local csStatesTable =
       defaults: {},
       overrides: [
         {
+          matcher: { id: 'byName', options: 'CS vServer' },
+          properties: [
+            {
+              id: 'links',
+              value: [
+                {
+                  title: 'View Chain',
+                  url: '/d/netscaler-chain?var-environment=${environment}&var-chain=${__value.raw}',
+                },
+              ],
+            },
+          ],
+        },
+        {
           matcher: { id: 'byName', options: 'Total Hits' },
           properties: [
             { id: 'unit', value: 'short' },
@@ -453,7 +462,10 @@ local csStatesTable =
 
 local csTopHits =
   barGauge.new('Top CS vServers by Hits')
-  + barGauge.queryOptions.withTargets([promQuery('topk(10, netscaler_cs_virtual_servers_total_hits{netscaler=~"$netscaler"})', '{{virtual_server}}')])
+  + barGauge.queryOptions.withTargets([
+    promQuery('topk(10, netscaler_cs_virtual_servers_total_hits{host_name=~"$host_name"})', '{{virtual_server}}')
+    + { instant: true },
+  ])
   + barGauge.queryOptions.withTransformations([
     {
       id: 'sortBy',
@@ -461,6 +473,12 @@ local csTopHits =
     },
   ])
   + barGauge.standardOptions.withUnit('short')
+  + barGauge.standardOptions.withLinks([
+    {
+      title: 'View Chain',
+      url: '/d/netscaler-chain?var-environment=${environment}&var-chain=${__field.labels.virtual_server}',
+    },
+  ])
   + barGauge.options.withDisplayMode('gradient')
   + barGauge.options.withOrientation('horizontal')
   + barGauge.gridPos.withW(12) + barGauge.gridPos.withH(8);
@@ -476,13 +494,13 @@ local csRow =
 local lbHealthTable =
   table.new('LB Virtual Server Health')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_virtual_servers_state{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_virtual_servers_state{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'A' },
-    promQuery('netscaler_virtual_servers_health{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_virtual_servers_health{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'B' },
-    promQuery('netscaler_virtual_servers_active_services{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_virtual_servers_active_services{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'C' },
-    promQuery('netscaler_virtual_servers_inactive_services{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_virtual_servers_inactive_services{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'D' },
   ])
   + table.queryOptions.withTransformations([
@@ -491,35 +509,14 @@ local lbHealthTable =
       options: { byField: 'virtual_server', mode: 'outer' },
     },
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(virtual_server|Value #[ABCD])$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: {
-          Time: true,
-          'Time 1': true,
-          'Time 2': true,
-          'Time 3': true,
-          'Time 4': true,
-          __name__: true,
-          '__name__ 1': true,
-          '__name__ 2': true,
-          '__name__ 3': true,
-          '__name__ 4': true,
-          instance: true,
-          'instance 1': true,
-          'instance 2': true,
-          'instance 3': true,
-          'instance 4': true,
-          job: true,
-          'job 1': true,
-          'job 2': true,
-          'job 3': true,
-          'job 4': true,
-          netscaler: true,
-          'netscaler 1': true,
-          'netscaler 2': true,
-          'netscaler 3': true,
-          'netscaler 4': true,
-        },
         indexByName: {
           virtual_server: 0,
           'Value #A': 1,
@@ -537,11 +534,35 @@ local lbHealthTable =
       },
     },
   ])
+  + {
+    fieldConfig: {
+      defaults: {},
+      overrides: [
+        {
+          matcher: { id: 'byName', options: 'LB vServer' },
+          properties: [
+            {
+              id: 'links',
+              value: [
+                {
+                  title: 'View Chain',
+                  url: '/d/netscaler-chain?var-environment=${environment}&var-chain=${__value.raw}',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  }
   + table.gridPos.withW(14) + table.gridPos.withH(8);
 
 local lbInactive =
   barGauge.new('LB vServers with Inactive Services')
-  + barGauge.queryOptions.withTargets([promQuery('netscaler_virtual_servers_inactive_services{netscaler=~"$netscaler"} > 0', '{{virtual_server}}')])
+  + barGauge.queryOptions.withTargets([
+    promQuery('netscaler_virtual_servers_inactive_services{host_name=~"$host_name"} > 0', '{{virtual_server}}')
+    + { instant: true },
+  ])
   + barGauge.queryOptions.withTransformations([
     {
       id: 'sortBy',
@@ -549,6 +570,12 @@ local lbInactive =
     },
   ])
   + barGauge.standardOptions.withUnit('short')
+  + barGauge.standardOptions.withLinks([
+    {
+      title: 'View Chain',
+      url: '/d/netscaler-chain?var-environment=${environment}&var-chain=${__field.labels.virtual_server}',
+    },
+  ])
   + barGauge.options.withDisplayMode('gradient')
   + barGauge.options.withOrientation('horizontal')
   + barGauge.standardOptions.thresholds.withMode('absolute')
@@ -569,14 +596,19 @@ local lbRow =
 local sgStatesTable =
   table.new('Service Group Member States')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_servicegroup_state{netscaler=~"$netscaler"}', '')
+    promQuery('netscaler_servicegroup_state{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(servicegroup|member|port|Value)$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: { Time: true, __name__: true, instance: true, job: true, netscaler: true },
         renameByName: {
           servicegroup: 'Service Group',
           member: 'Member',
@@ -591,14 +623,19 @@ local sgStatesTable =
 local sgDown =
   table.new('Down Service Group Members')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_servicegroup_state{netscaler=~"$netscaler"} == 0', '')
+    promQuery('netscaler_servicegroup_state{host_name=~"$host_name"} == 0', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(servicegroup|member|port)$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: { Time: true, __name__: true, instance: true, job: true, netscaler: true, Value: true },
         renameByName: {
           servicegroup: 'Service Group',
           member: 'Member',
@@ -611,7 +648,10 @@ local sgDown =
 
 local sgTtfb =
   barGauge.new('Top TTFB by Service Group')
-  + barGauge.queryOptions.withTargets([promQuery('topk(10, avg by (servicegroup) (netscaler_servicegroup_average_time_to_first_byte{netscaler=~"$netscaler"}))', '{{servicegroup}}')])
+  + barGauge.queryOptions.withTargets([
+    promQuery('topk(10, avg by (servicegroup) (netscaler_servicegroup_average_time_to_first_byte{host_name=~"$host_name"}))', '{{servicegroup}}')
+    + { instant: true },
+  ])
   + barGauge.standardOptions.withUnit('ms')
   + barGauge.options.withDisplayMode('gradient')
   + barGauge.options.withOrientation('horizontal')
@@ -658,15 +698,15 @@ local otherRows = g.util.grid.makeGrid([
   sgRow,
 ], panelWidth=24, panelHeight=8, startY=21);
 
-g.dashboard.new('NetScaler Admin Dashboard')
-+ g.dashboard.withUid('netscaler-admin')
-+ g.dashboard.withDescription('Infrastructure overview for NetScaler ADC operators')
+g.dashboard.new('NetScaler HA Pair')
++ g.dashboard.withUid('netscaler-ha-pair')
++ g.dashboard.withDescription('Detailed view of a single NetScaler HA cluster')
 + g.dashboard.withRefresh('30s')
 + g.dashboard.withTimezone('browser')
 + g.dashboard.time.withFrom('now-1h')
 + g.dashboard.time.withTo('now')
 + g.dashboard.graphTooltip.withSharedCrosshair()
-+ g.dashboard.withVariables([datasource, netscaler])
++ g.dashboard.withVariables([datasource, environment, netscalerCluster, hostName])
 + g.dashboard.withPanels(
   g.util.panel.setPanelIDs(haPanels + sslAndSystemPanels + otherRows)
 )

@@ -16,10 +16,16 @@ fi
 mkdir -p "$OUTPUT_DIR"
 
 # Generate dashboards
-echo "Generating admin.json..."
-jsonnet -J vendor admin.jsonnet > "${OUTPUT_DIR}/admin.json"
+echo "Generating environment.json..."
+jsonnet -J vendor environment.jsonnet > "${OUTPUT_DIR}/environment.json"
+
+echo "Generating ha-pair.json..."
+jsonnet -J vendor ha-pair.jsonnet > "${OUTPUT_DIR}/ha-pair.json"
 
 echo "Generating chain.json..."
 jsonnet -J vendor chain.jsonnet > "${OUTPUT_DIR}/chain.json"
+
+echo "Generating problems.json..."
+jsonnet -J vendor problems.jsonnet > "${OUTPUT_DIR}/problems.json"
 
 echo "Done! Dashboards written to: ${OUTPUT_DIR}"

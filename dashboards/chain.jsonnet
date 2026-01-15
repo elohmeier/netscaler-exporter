@@ -13,12 +13,19 @@ local datasource =
   var.datasource.new('datasource', 'prometheus')
   + var.datasource.generalOptions.withLabel('Data source');
 
+local environment =
+  var.query.new('environment')
+  + var.query.withDatasourceFromVariable(datasource)
+  + var.query.queryTypes.withLabelValues('deployment_environment_name', 'netscaler_topology_node{chain!=""}')
+  + var.query.withRefresh('time')
+  + var.query.generalOptions.withLabel('Environment');
+
 // Chain variable - gets all unique chain values from topology nodes
 // Chains can start with either CS vservers or standalone LB vservers
 local chain =
   var.query.new('chain')
   + var.query.withDatasourceFromVariable(datasource)
-  + var.query.queryTypes.withLabelValues('chain', 'netscaler_topology_node{chain!=""}')
+  + var.query.queryTypes.withLabelValues('chain', 'netscaler_topology_node{deployment_environment_name=~"$environment",chain!=""}')
   + var.query.withRefresh('time')
   + var.query.selectionOptions.withMulti(true)
   + var.query.generalOptions.withLabel('Chain')
@@ -28,7 +35,7 @@ local chain =
 local lbvserver =
   var.query.new('lbvserver')
   + var.query.withDatasourceFromVariable(datasource)
-  + var.query.queryTypes.withLabelValues('title', 'netscaler_topology_node{chain=~"$chain",node_type="lbvserver"}')
+  + var.query.queryTypes.withLabelValues('title', 'netscaler_topology_node{deployment_environment_name=~"$environment",chain=~".*$chain.*",node_type="lbvserver"}')
   + var.query.withRefresh('time')
   + var.query.selectionOptions.withMulti(true)
   + var.query.selectionOptions.withIncludeAll(true)
@@ -38,7 +45,7 @@ local lbvserver =
 local servicegroup =
   var.query.new('servicegroup')
   + var.query.withDatasourceFromVariable(datasource)
-  + var.query.queryTypes.withLabelValues('title', 'netscaler_topology_node{chain=~"$chain",node_type="servicegroup"}')
+  + var.query.queryTypes.withLabelValues('title', 'netscaler_topology_node{deployment_environment_name=~"$environment",chain=~".*$chain.*",node_type="servicegroup"}')
   + var.query.withRefresh('time')
   + var.query.selectionOptions.withMulti(true)
   + var.query.selectionOptions.withIncludeAll(true)
@@ -47,7 +54,8 @@ local servicegroup =
 // Helper for prometheus queries
 local promQuery(expr, legend='') =
   g.query.prometheus.new('$datasource', expr)
-  + g.query.prometheus.withLegendFormat(legend);
+  + g.query.prometheus.withLegendFormat(legend)
+  + g.query.prometheus.withInterval('1m');
 
 // State value mapping (0=DOWN, 1=UP)
 local stateMapping = [
@@ -85,10 +93,10 @@ local topologyGraph =
   + nodeGraph.panelOptions.withDescription('Routing topology: CS vServer -> LB vServer -> Service Group -> Server')
   + nodeGraph.queryOptions.withTargets([
     // Nodes query
-    promQuery('netscaler_topology_node{chain=~"$chain"}', '')
+    promQuery('netscaler_topology_node{chain=~".*$chain.*"}', '')
     + { format: 'table', instant: true, refId: 'nodes' },
     // Edges query
-    promQuery('netscaler_topology_edge{chain=~"$chain"}', '')
+    promQuery('netscaler_topology_edge{chain=~".*$chain.*"}', '')
     + { format: 'table', instant: true, refId: 'edges' },
   ])
   + {
@@ -99,7 +107,7 @@ local topologyGraph =
       zoomMode: 'cooperative',
     },
   }
-  + { gridPos: { h: 25, w: 24, x: 0, y: 1 } };
+  + { gridPos: { h: 24, w: 12, x: 0, y: 1 } };
 
 local topologyRow =
   row.new('Topology')
@@ -121,7 +129,7 @@ local chainRootState =
   + stateThresholds
   + stat.options.withColorMode('background')
   + stat.options.withGraphMode('none')
-  + stat.gridPos.withW(4) + stat.gridPos.withH(4);
+  + { gridPos: { h: 4, w: 12, x: 12, y: 1 } };
 
 local chainHits =
   stat.new('Total Hits')
@@ -131,7 +139,8 @@ local chainHits =
   ])
   + stat.standardOptions.withUnit('short')
   + stat.options.withColorMode('none')
-  + stat.gridPos.withW(4) + stat.gridPos.withH(4);
+  + stat.options.withGraphMode('area')
+  + { gridPos: { h: 4, w: 6, x: 12, y: 5 } };
 
 local chainConnections =
   stat.new('Active Connections')
@@ -141,19 +150,30 @@ local chainConnections =
   ])
   + stat.standardOptions.withUnit('short')
   + stat.options.withColorMode('none')
-  + stat.gridPos.withW(4) + stat.gridPos.withH(4);
+  + stat.options.withGraphMode('area')
+  + { gridPos: { h: 4, w: 6, x: 18, y: 5 } };
 
 local chainComponentsTable =
   table.new('Chain Components')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_topology_node{chain=~"$chain"}', '')
+    promQuery('netscaler_topology_node{chain=~".*$chain.*"}', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(title|node_type|state)$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: { Time: true, __name__: true, instance: true, job: true, netscaler: true, Value: true, id: true, chain: true },
+        indexByName: {
+          node_type: 0,
+          title: 1,
+          state: 2,
+        },
         renameByName: {
           title: 'Component',
           node_type: 'Type',
@@ -162,11 +182,7 @@ local chainComponentsTable =
       },
     },
   ])
-  + table.gridPos.withW(12) + table.gridPos.withH(4);
-
-local chainHealthRow =
-  row.new('Chain Health')
-  + row.withPanels([chainRootState, chainHits, chainConnections, chainComponentsTable]);
+  + { gridPos: { h: 16, w: 12, x: 12, y: 9 } };
 
 // ============================================================================
 // LB Virtual Servers Row
@@ -174,9 +190,9 @@ local chainHealthRow =
 local lbStatesTable =
   table.new('LB vServer States')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_virtual_servers_state{virtual_server=~"$lbvserver"}', '')
+    promQuery('max by (virtual_server) (netscaler_virtual_servers_state{virtual_server=~"$lbvserver"})', '')
     + { format: 'table', instant: true, refId: 'A' },
-    promQuery('netscaler_virtual_servers_health{virtual_server=~"$lbvserver"}', '')
+    promQuery('max by (virtual_server) (netscaler_virtual_servers_health{virtual_server=~"$lbvserver"})', '')
     + { format: 'table', instant: true, refId: 'B' },
   ])
   + table.queryOptions.withTransformations([
@@ -185,25 +201,14 @@ local lbStatesTable =
       options: { byField: 'virtual_server', mode: 'outer' },
     },
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(virtual_server|Value #[AB])$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: {
-          Time: true,
-          'Time 1': true,
-          'Time 2': true,
-          __name__: true,
-          '__name__ 1': true,
-          '__name__ 2': true,
-          instance: true,
-          'instance 1': true,
-          'instance 2': true,
-          job: true,
-          'job 1': true,
-          'job 2': true,
-          netscaler: true,
-          'netscaler 1': true,
-          'netscaler 2': true,
-        },
         indexByName: {
           virtual_server: 0,
           'Value #A': 1,
@@ -221,7 +226,7 @@ local lbStatesTable =
 
 local lbHealthGauge =
   barGauge.new('LB vServer Health')
-  + barGauge.queryOptions.withTargets([promQuery('netscaler_virtual_servers_health{virtual_server=~"$lbvserver"}', '{{virtual_server}}')])
+  + barGauge.queryOptions.withTargets([promQuery('max by (virtual_server) (netscaler_virtual_servers_health{virtual_server=~"$lbvserver"})', '{{virtual_server}}')])
   + barGauge.standardOptions.withUnit('percent')
   + barGauge.standardOptions.withMin(0) + barGauge.standardOptions.withMax(100)
   + barGauge.options.withDisplayMode('gradient')
@@ -237,23 +242,23 @@ local lbHealthGauge =
 local lbActiveInactive =
   timeSeries.new('Active / Inactive Services')
   + timeSeries.queryOptions.withTargets([
-    promQuery('netscaler_virtual_servers_active_services{virtual_server=~"$lbvserver"}', '{{virtual_server}} Active'),
-    promQuery('netscaler_virtual_servers_inactive_services{virtual_server=~"$lbvserver"}', '{{virtual_server}} Inactive'),
+    promQuery('max by (virtual_server) (netscaler_virtual_servers_active_services{virtual_server=~"$lbvserver"})', '{{virtual_server}} Active'),
+    promQuery('max by (virtual_server) (netscaler_virtual_servers_inactive_services{virtual_server=~"$lbvserver"})', '{{virtual_server}} Inactive'),
   ])
   + timeSeries.standardOptions.withUnit('short')
   + timeSeries.gridPos.withW(8) + timeSeries.gridPos.withH(6);
 
 local lbRequests =
   timeSeries.new('LB Requests')
-  + timeSeries.queryOptions.withTargets([promQuery('rate(netscaler_virtual_servers_total_requests{virtual_server=~"$lbvserver"}[$__rate_interval])', '{{virtual_server}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_total_requests{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}}')])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
 
 local lbTraffic =
   timeSeries.new('LB Traffic')
   + timeSeries.queryOptions.withTargets([
-    promQuery('rate(netscaler_virtual_servers_total_request_bytes{virtual_server=~"$lbvserver"}[$__rate_interval])', '{{virtual_server}} RX'),
-    promQuery('rate(netscaler_virtual_servers_total_response_bytes{virtual_server=~"$lbvserver"}[$__rate_interval])', '{{virtual_server}} TX'),
+    promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_total_request_bytes{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}} RX'),
+    promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_total_response_bytes{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}} TX'),
   ])
   + timeSeries.standardOptions.withUnit('Bps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
@@ -268,9 +273,9 @@ local lbRow =
 local sgMembersTable =
   table.new('Service Group Members')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_servicegroup_state{servicegroup=~"$servicegroup"}', '')
+    promQuery('max by (servicegroup, member, port) (netscaler_servicegroup_state{servicegroup=~"$servicegroup"})', '')
     + { format: 'table', instant: true, refId: 'A' },
-    promQuery('netscaler_servicegroup_average_time_to_first_byte{servicegroup=~"$servicegroup"}', '')
+    promQuery('max by (servicegroup, member, port) (netscaler_servicegroup_average_time_to_first_byte{servicegroup=~"$servicegroup"})', '')
     + { format: 'table', instant: true, refId: 'B' },
   ])
   + table.queryOptions.withTransformations([
@@ -279,29 +284,14 @@ local sgMembersTable =
       options: { byField: 'member', mode: 'outer' },
     },
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(servicegroup|member|port|Value #[AB])$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: {
-          Time: true,
-          'Time 1': true,
-          'Time 2': true,
-          __name__: true,
-          '__name__ 1': true,
-          '__name__ 2': true,
-          instance: true,
-          'instance 1': true,
-          'instance 2': true,
-          job: true,
-          'job 1': true,
-          'job 2': true,
-          netscaler: true,
-          'netscaler 1': true,
-          'netscaler 2': true,
-          'servicegroup 1': true,
-          'servicegroup 2': true,
-          'port 1': true,
-          'port 2': true,
-        },
         indexByName: {
           servicegroup: 0,
           member: 1,
@@ -323,7 +313,7 @@ local sgMembersTable =
 
 local sgTtfb =
   barGauge.new('TTFB per Member')
-  + barGauge.queryOptions.withTargets([promQuery('netscaler_servicegroup_average_time_to_first_byte{servicegroup=~"$servicegroup"}', '{{member}}:{{port}}')])
+  + barGauge.queryOptions.withTargets([promQuery('max by (servicegroup, member, port) (netscaler_servicegroup_average_time_to_first_byte{servicegroup=~"$servicegroup"})', '{{member}}:{{port}}')])
   + barGauge.standardOptions.withUnit('ms')
   + barGauge.options.withDisplayMode('gradient')
   + barGauge.options.withOrientation('horizontal')
@@ -337,13 +327,13 @@ local sgTtfb =
 
 local sgRequests =
   timeSeries.new('Member Requests')
-  + timeSeries.queryOptions.withTargets([promQuery('rate(netscaler_servicegroup_total_requests{servicegroup=~"$servicegroup"}[$__rate_interval])', '{{member}}:{{port}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('max by (servicegroup, member, port) (rate(netscaler_servicegroup_total_requests{servicegroup=~"$servicegroup"}[$__rate_interval]))', '{{member}}:{{port}}')])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
 
 local sgConnections =
   timeSeries.new('Member Connections')
-  + timeSeries.queryOptions.withTargets([promQuery('netscaler_servicegroup_current_server_connections{servicegroup=~"$servicegroup"}', '{{member}}:{{port}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('max by (servicegroup, member, port) (netscaler_servicegroup_current_server_connections{servicegroup=~"$servicegroup"})', '{{member}}:{{port}}')])
   + timeSeries.standardOptions.withUnit('short')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
 
@@ -358,14 +348,19 @@ local sgRow =
 local serverStatesTable =
   table.new('Backend Server States')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_topology_node{chain=~"$chain",node_type="server"}', '')
+    promQuery('max by (title, state) (netscaler_topology_node{chain=~".*$chain.*",node_type="server"})', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(title|state)$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: { Time: true, __name__: true, instance: true, job: true, netscaler: true, Value: true, id: true, chain: true, node_type: true },
         indexByName: {
           title: 0,
           state: 1,
@@ -382,8 +377,8 @@ local serverStatesTable =
 local serverHealthSummary =
   stat.new('Servers UP')
   + stat.queryOptions.withTargets([
-    promQuery('count(netscaler_topology_node{chain=~"$chain",node_type="server",state="UP"}) or vector(0)', 'UP'),
-    promQuery('count(netscaler_topology_node{chain=~"$chain",node_type="server"}) or vector(0)', 'Total'),
+    promQuery('count(max by (title) (netscaler_topology_node{chain=~".*$chain.*",node_type="server",state="UP"})) or vector(0)', 'UP'),
+    promQuery('count(max by (title) (netscaler_topology_node{chain=~".*$chain.*",node_type="server"})) or vector(0)', 'Total'),
   ])
   + stat.options.withColorMode('none')
   + stat.options.withGraphMode('none')
@@ -392,14 +387,19 @@ local serverHealthSummary =
 local serverDown =
   table.new('Down Servers')
   + table.queryOptions.withTargets([
-    promQuery('netscaler_topology_node{chain=~"$chain",node_type="server",state="DOWN"}', '')
+    promQuery('max by (title) (netscaler_topology_node{chain=~".*$chain.*",node_type="server",state="DOWN"})', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
     {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^title$' },
+      },
+    },
+    {
       id: 'organize',
       options: {
-        excludeByName: { Time: true, __name__: true, instance: true, job: true, netscaler: true, Value: true, id: true, chain: true, node_type: true, state: true },
         renameByName: { title: 'Server' },
       },
     },
@@ -417,21 +417,24 @@ local serverRow =
 // Dashboard
 // ============================================================================
 
-// Topology panels with manual positioning
+// Topology panels with manual positioning (node graph left, stats+table right)
 local topologyPanels = [
   topologyRow,
   topologyGraph,
+  chainRootState,
+  chainHits,
+  chainConnections,
+  chainComponentsTable,
 ];
 
-// Other rows use grid layout starting at y=26 (after topology: row at y=0, panel at y=1 with h=25)
+// Other rows use grid layout starting at y=25 (after topology section)
 local otherRows = g.util.grid.makeGrid([
-  chainHealthRow,
   lbRow,
   sgRow,
   serverRow,
-], panelWidth=24, startY=26);
+], panelWidth=24, startY=25);
 
-g.dashboard.new('NetScaler Chain Dashboard')
+g.dashboard.new('NetScaler Chain')
 + g.dashboard.withUid('netscaler-chain')
 + g.dashboard.withDescription('Chain-focused view for NetScaler consumers - select chains to see routing topology and health')
 + g.dashboard.withRefresh('1m')
@@ -439,7 +442,7 @@ g.dashboard.new('NetScaler Chain Dashboard')
 + g.dashboard.time.withFrom('now-1h')
 + g.dashboard.time.withTo('now')
 + g.dashboard.graphTooltip.withSharedCrosshair()
-+ g.dashboard.withVariables([datasource, chain, lbvserver, servicegroup])
++ g.dashboard.withVariables([datasource, environment, chain, lbvserver, servicegroup])
 + g.dashboard.withPanels(
   g.util.panel.setPanelIDs(topologyPanels + otherRows)
 )

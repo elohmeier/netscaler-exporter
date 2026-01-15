@@ -1,0 +1,1380 @@
+{
+   "description": "Problem detection dashboard for identifying misconfigurations, down services, and issues requiring attention",
+   "graphTooltip": 1,
+   "panels": [
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "title": "Problem Summary",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "green",
+                        "value": null
+                     },
+                     {
+                        "color": "red",
+                        "value": 1
+                     }
+                  ]
+               }
+            }
+         },
+         "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 0,
+            "y": 1
+         },
+         "id": 2,
+         "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "count(max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)) or vector(0)",
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "DOWN vServers",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "green",
+                        "value": null
+                     },
+                     {
+                        "color": "red",
+                        "value": 1
+                     }
+                  ]
+               }
+            }
+         },
+         "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 4,
+            "y": 1
+         },
+         "id": 3,
+         "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "count(max by (virtual_server, netscaler_cluster) (netscaler_cs_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)) or vector(0)",
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "DOWN CS vServers",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "green",
+                        "value": null
+                     },
+                     {
+                        "color": "yellow",
+                        "value": 1
+                     },
+                     {
+                        "color": "red",
+                        "value": 5
+                     }
+                  ]
+               }
+            }
+         },
+         "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 8,
+            "y": 1
+         },
+         "id": 4,
+         "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "count(max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 0 and netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 100)) or vector(0)",
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Degraded vServers",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "green",
+                        "value": null
+                     },
+                     {
+                        "color": "red",
+                        "value": 1
+                     }
+                  ]
+               }
+            }
+         },
+         "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 12,
+            "y": 1
+         },
+         "id": 5,
+         "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "count(max by (servicegroup, member, port, netscaler_cluster) (netscaler_servicegroup_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)) or vector(0)",
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "DOWN SG Members",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "green",
+                        "value": null
+                     },
+                     {
+                        "color": "red",
+                        "value": 1
+                     }
+                  ]
+               }
+            }
+         },
+         "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 16,
+            "y": 1
+         },
+         "id": 6,
+         "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "count(max by (certkey, netscaler_cluster) (netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 30 and netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 0)) or vector(0)",
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Certs < 30 days",
+         "type": "stat"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                     {
+                        "color": "green",
+                        "value": null
+                     },
+                     {
+                        "color": "yellow",
+                        "value": 1
+                     }
+                  ]
+               }
+            }
+         },
+         "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 1
+         },
+         "id": 7,
+         "options": {
+            "colorMode": "background",
+            "graphMode": "none"
+         },
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "count(max by (certkey, netscaler_cluster) (netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} >= 30 and netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 90)) or vector(0)",
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "Certs 30-90 days",
+         "type": "stat"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 5
+         },
+         "id": 8,
+         "panels": [ ],
+         "title": "DOWN Virtual Servers",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": { },
+            "overrides": [
+               {
+                  "matcher": {
+                     "id": "byName",
+                     "options": "LB vServer"
+                  },
+                  "properties": [
+                     {
+                        "id": "links",
+                        "value": [
+                           {
+                              "title": "View Chain",
+                              "url": "/d/netscaler-chain?var-environment=${__data.fields.Environment}&var-chain=${__value.raw}"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            ]
+         },
+         "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 6
+         },
+         "id": 9,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "DOWN LB Virtual Servers",
+         "transformations": [
+            {
+               "id": "filterFieldsByName",
+               "options": {
+                  "include": {
+                     "pattern": "^(virtual_server|netscaler_cluster|deployment_environment_name)$"
+                  }
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "indexByName": {
+                     "deployment_environment_name": 0,
+                     "netscaler_cluster": 1,
+                     "virtual_server": 2
+                  },
+                  "renameByName": {
+                     "deployment_environment_name": "Environment",
+                     "netscaler_cluster": "Cluster",
+                     "virtual_server": "LB vServer"
+                  }
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": { },
+            "overrides": [
+               {
+                  "matcher": {
+                     "id": "byName",
+                     "options": "CS vServer"
+                  },
+                  "properties": [
+                     {
+                        "id": "links",
+                        "value": [
+                           {
+                              "title": "View Chain",
+                              "url": "/d/netscaler-chain?var-environment=${__data.fields.Environment}&var-chain=${__value.raw}"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            ]
+         },
+         "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 16
+         },
+         "id": 10,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_cs_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "DOWN CS Virtual Servers",
+         "transformations": [
+            {
+               "id": "filterFieldsByName",
+               "options": {
+                  "include": {
+                     "pattern": "^(virtual_server|netscaler_cluster|deployment_environment_name)$"
+                  }
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "indexByName": {
+                     "deployment_environment_name": 0,
+                     "netscaler_cluster": 1,
+                     "virtual_server": 2
+                  },
+                  "renameByName": {
+                     "deployment_environment_name": "Environment",
+                     "netscaler_cluster": "Cluster",
+                     "virtual_server": "CS vServer"
+                  }
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+         },
+         "id": 11,
+         "panels": [ ],
+         "title": "Degraded Health",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": { },
+            "overrides": [
+               {
+                  "matcher": {
+                     "id": "byName",
+                     "options": "Health %"
+                  },
+                  "properties": [
+                     {
+                        "id": "unit",
+                        "value": "percent"
+                     },
+                     {
+                        "id": "thresholds",
+                        "value": {
+                           "mode": "absolute",
+                           "steps": [
+                              {
+                                 "color": "red",
+                                 "value": null
+                              },
+                              {
+                                 "color": "yellow",
+                                 "value": 50
+                              },
+                              {
+                                 "color": "green",
+                                 "value": 100
+                              }
+                           ]
+                        }
+                     },
+                     {
+                        "id": "custom.cellOptions",
+                        "value": {
+                           "type": "color-background"
+                        }
+                     }
+                  ]
+               },
+               {
+                  "matcher": {
+                     "id": "byName",
+                     "options": "Inactive"
+                  },
+                  "properties": [
+                     {
+                        "id": "thresholds",
+                        "value": {
+                           "mode": "absolute",
+                           "steps": [
+                              {
+                                 "color": "green",
+                                 "value": null
+                              },
+                              {
+                                 "color": "yellow",
+                                 "value": 1
+                              },
+                              {
+                                 "color": "red",
+                                 "value": 5
+                              }
+                           ]
+                        }
+                     },
+                     {
+                        "id": "custom.cellOptions",
+                        "value": {
+                           "type": "color-background"
+                        }
+                     }
+                  ]
+               },
+               {
+                  "matcher": {
+                     "id": "byName",
+                     "options": "vServer"
+                  },
+                  "properties": [
+                     {
+                        "id": "links",
+                        "value": [
+                           {
+                              "title": "View Chain",
+                              "url": "/d/netscaler-chain?var-environment=${__data.fields.Environment}&var-chain=${__value.raw}"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            ]
+         },
+         "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 27
+         },
+         "id": 12,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 0 and netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 100)",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": "",
+               "refId": "A"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_active_services{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} and on(virtual_server, netscaler_cluster) (netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 0 and netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 100))",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": "",
+               "refId": "B"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_inactive_services{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} and on(virtual_server, netscaler_cluster) (netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 0 and netscaler_virtual_servers_health{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 100))",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": "",
+               "refId": "C"
+            }
+         ],
+         "title": "vServers with Degraded Health",
+         "transformations": [
+            {
+               "id": "joinByField",
+               "options": {
+                  "byField": "virtual_server",
+                  "mode": "outer"
+               }
+            },
+            {
+               "id": "filterFieldsByName",
+               "options": {
+                  "include": {
+                     "pattern": "^(virtual_server|netscaler_cluster|deployment_environment_name|Value #[ABC])$"
+                  }
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "excludeByName": {
+                     "deployment_environment_name 1": true,
+                     "deployment_environment_name 2": true,
+                     "netscaler_cluster 1": true,
+                     "netscaler_cluster 2": true
+                  },
+                  "indexByName": {
+                     "Value #A": 3,
+                     "Value #B": 4,
+                     "Value #C": 5,
+                     "deployment_environment_name": 0,
+                     "netscaler_cluster": 1,
+                     "virtual_server": 2
+                  },
+                  "renameByName": {
+                     "Value #A": "Health %",
+                     "Value #B": "Active",
+                     "Value #C": "Inactive",
+                     "deployment_environment_name": "Environment",
+                     "netscaler_cluster": "Cluster",
+                     "virtual_server": "vServer"
+                  }
+               }
+            },
+            {
+               "id": "sortBy",
+               "options": {
+                  "sort": [
+                     {
+                        "desc": false,
+                        "field": "Health %"
+                     }
+                  ]
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 37
+         },
+         "id": 13,
+         "panels": [ ],
+         "title": "DOWN Service Group Members",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 38
+         },
+         "id": 14,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (servicegroup, member, port, netscaler_cluster, deployment_environment_name) (netscaler_servicegroup_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "DOWN Service Group Members",
+         "transformations": [
+            {
+               "id": "filterFieldsByName",
+               "options": {
+                  "include": {
+                     "pattern": "^(servicegroup|member|port|netscaler_cluster|deployment_environment_name)$"
+                  }
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "indexByName": {
+                     "deployment_environment_name": 0,
+                     "member": 3,
+                     "netscaler_cluster": 1,
+                     "port": 4,
+                     "servicegroup": 2
+                  },
+                  "renameByName": {
+                     "deployment_environment_name": "Environment",
+                     "member": "Member",
+                     "netscaler_cluster": "Cluster",
+                     "port": "Port",
+                     "servicegroup": "Service Group"
+                  }
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 48
+         },
+         "id": 15,
+         "panels": [ ],
+         "title": "SSL Certificate Expiry",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": { },
+            "overrides": [
+               {
+                  "matcher": {
+                     "id": "byName",
+                     "options": "Days to Expire"
+                  },
+                  "properties": [
+                     {
+                        "id": "unit",
+                        "value": "d"
+                     },
+                     {
+                        "id": "thresholds",
+                        "value": {
+                           "mode": "absolute",
+                           "steps": [
+                              {
+                                 "color": "red",
+                                 "value": null
+                              },
+                              {
+                                 "color": "yellow",
+                                 "value": 7
+                              },
+                              {
+                                 "color": "orange",
+                                 "value": 14
+                              }
+                           ]
+                        }
+                     },
+                     {
+                        "id": "custom.cellOptions",
+                        "value": {
+                           "type": "color-background"
+                        }
+                     }
+                  ]
+               }
+            ]
+         },
+         "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 49
+         },
+         "id": 16,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (certkey, netscaler_cluster, deployment_environment_name) (netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 30 and netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 0)",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "SSL Certificates Expiring < 30 days",
+         "transformations": [
+            {
+               "id": "filterFieldsByName",
+               "options": {
+                  "include": {
+                     "pattern": "^(certkey|netscaler_cluster|deployment_environment_name|Value)$"
+                  }
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "indexByName": {
+                     "Value": 3,
+                     "certkey": 2,
+                     "deployment_environment_name": 0,
+                     "netscaler_cluster": 1
+                  },
+                  "renameByName": {
+                     "Value": "Days to Expire",
+                     "certkey": "Certificate",
+                     "deployment_environment_name": "Environment",
+                     "netscaler_cluster": "Cluster"
+                  }
+               }
+            },
+            {
+               "id": "sortBy",
+               "options": {
+                  "sort": [
+                     {
+                        "desc": false,
+                        "field": "Days to Expire"
+                     }
+                  ]
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": { },
+            "overrides": [
+               {
+                  "matcher": {
+                     "id": "byName",
+                     "options": "Days to Expire"
+                  },
+                  "properties": [
+                     {
+                        "id": "unit",
+                        "value": "d"
+                     },
+                     {
+                        "id": "thresholds",
+                        "value": {
+                           "mode": "absolute",
+                           "steps": [
+                              {
+                                 "color": "yellow",
+                                 "value": null
+                              },
+                              {
+                                 "color": "green",
+                                 "value": 60
+                              }
+                           ]
+                        }
+                     },
+                     {
+                        "id": "custom.cellOptions",
+                        "value": {
+                           "type": "color-background"
+                        }
+                     }
+                  ]
+               }
+            ]
+         },
+         "gridPos": {
+            "h": 10,
+            "w": 24,
+            "x": 0,
+            "y": 59
+         },
+         "id": 17,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (certkey, netscaler_cluster, deployment_environment_name) (netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} >= 30 and netscaler_ssl_cert_days_to_expire{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} < 90)",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": ""
+            }
+         ],
+         "title": "SSL Certificates Expiring 30-90 days",
+         "transformations": [
+            {
+               "id": "filterFieldsByName",
+               "options": {
+                  "include": {
+                     "pattern": "^(certkey|netscaler_cluster|deployment_environment_name|Value)$"
+                  }
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "indexByName": {
+                     "Value": 3,
+                     "certkey": 2,
+                     "deployment_environment_name": 0,
+                     "netscaler_cluster": 1
+                  },
+                  "renameByName": {
+                     "Value": "Days to Expire",
+                     "certkey": "Certificate",
+                     "deployment_environment_name": "Environment",
+                     "netscaler_cluster": "Cluster"
+                  }
+               }
+            },
+            {
+               "id": "sortBy",
+               "options": {
+                  "sort": [
+                     {
+                        "desc": false,
+                        "field": "Days to Expire"
+                     }
+                  ]
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "collapsed": true,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 69
+         },
+         "id": 18,
+         "panels": [
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": { },
+                  "overrides": [
+                     {
+                        "matcher": {
+                           "id": "byName",
+                           "options": "vServer (UP but zero hits)"
+                        },
+                        "properties": [
+                           {
+                              "id": "links",
+                              "value": [
+                                 {
+                                    "title": "View Chain",
+                                    "url": "/d/netscaler-chain?var-environment=${__data.fields.Environment}&var-chain=${__value.raw}"
+                                 }
+                              ]
+                           }
+                        ]
+                     }
+                  ]
+               },
+               "gridPos": {
+                  "h": 10,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 19,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_total_hits{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0) and on(virtual_server, netscaler_cluster) max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 1)",
+                     "format": "table",
+                     "instant": true,
+                     "interval": "1m",
+                     "legendFormat": ""
+                  }
+               ],
+               "title": "vServers with Zero Hits (potentially unused)",
+               "transformations": [
+                  {
+                     "id": "filterFieldsByName",
+                     "options": {
+                        "include": {
+                           "pattern": "^(virtual_server|netscaler_cluster|deployment_environment_name)$"
+                        }
+                     }
+                  },
+                  {
+                     "id": "organize",
+                     "options": {
+                        "indexByName": {
+                           "deployment_environment_name": 0,
+                           "netscaler_cluster": 1,
+                           "virtual_server": 2
+                        },
+                        "renameByName": {
+                           "deployment_environment_name": "Environment",
+                           "netscaler_cluster": "Cluster",
+                           "virtual_server": "vServer (UP but zero hits)"
+                        }
+                     }
+                  }
+               ],
+               "type": "table"
+            }
+         ],
+         "title": "Potentially Unused Configuration",
+         "type": "row"
+      },
+      {
+         "collapsed": true,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 70
+         },
+         "id": 20,
+         "panels": [
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": { },
+                  "overrides": [
+                     {
+                        "matcher": {
+                           "id": "byName",
+                           "options": "vServer"
+                        },
+                        "properties": [
+                           {
+                              "id": "links",
+                              "value": [
+                                 {
+                                    "title": "View Chain",
+                                    "url": "/d/netscaler-chain?var-environment=${__data.fields.Environment}&var-chain=${__value.raw}"
+                                 }
+                              ]
+                           }
+                        ]
+                     },
+                     {
+                        "matcher": {
+                           "id": "byName",
+                           "options": "Inactive"
+                        },
+                        "properties": [
+                           {
+                              "id": "thresholds",
+                              "value": {
+                                 "mode": "absolute",
+                                 "steps": [
+                                    {
+                                       "color": "yellow",
+                                       "value": null
+                                    },
+                                    {
+                                       "color": "orange",
+                                       "value": 5
+                                    },
+                                    {
+                                       "color": "red",
+                                       "value": 10
+                                    }
+                                 ]
+                              }
+                           },
+                           {
+                              "id": "custom.cellOptions",
+                              "value": {
+                                 "type": "color-background"
+                              }
+                           }
+                        ]
+                     }
+                  ]
+               },
+               "gridPos": {
+                  "h": 10,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 21,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_inactive_services{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 2)",
+                     "format": "table",
+                     "instant": true,
+                     "interval": "1m",
+                     "legendFormat": "",
+                     "refId": "A"
+                  },
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_active_services{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} and on(virtual_server, netscaler_cluster) (netscaler_virtual_servers_inactive_services{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} > 2))",
+                     "format": "table",
+                     "instant": true,
+                     "interval": "1m",
+                     "legendFormat": "",
+                     "refId": "B"
+                  }
+               ],
+               "title": "vServers with Many Inactive Services",
+               "transformations": [
+                  {
+                     "id": "joinByField",
+                     "options": {
+                        "byField": "virtual_server",
+                        "mode": "outer"
+                     }
+                  },
+                  {
+                     "id": "filterFieldsByName",
+                     "options": {
+                        "include": {
+                           "pattern": "^(virtual_server|netscaler_cluster|deployment_environment_name|Value #[AB])$"
+                        }
+                     }
+                  },
+                  {
+                     "id": "organize",
+                     "options": {
+                        "excludeByName": {
+                           "deployment_environment_name 1": true,
+                           "netscaler_cluster 1": true
+                        },
+                        "indexByName": {
+                           "Value #A": 4,
+                           "Value #B": 3,
+                           "deployment_environment_name": 0,
+                           "netscaler_cluster": 1,
+                           "virtual_server": 2
+                        },
+                        "renameByName": {
+                           "Value #A": "Inactive",
+                           "Value #B": "Active",
+                           "deployment_environment_name": "Environment",
+                           "netscaler_cluster": "Cluster",
+                           "virtual_server": "vServer"
+                        }
+                     }
+                  },
+                  {
+                     "id": "sortBy",
+                     "options": {
+                        "sort": [
+                           {
+                              "desc": true,
+                              "field": "Inactive"
+                           }
+                        ]
+                     }
+                  }
+               ],
+               "type": "table"
+            }
+         ],
+         "title": "High Inactive Services",
+         "type": "row"
+      },
+      {
+         "collapsed": true,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 71
+         },
+         "id": 22,
+         "panels": [
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": {
+                     "color": {
+                        "mode": "palette-classic"
+                     },
+                     "unit": "short"
+                  }
+               },
+               "gridPos": {
+                  "h": 10,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 23,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "count(max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)) or vector(0)",
+                     "interval": "1m",
+                     "legendFormat": "LB DOWN"
+                  },
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "count(max by (virtual_server, netscaler_cluster) (netscaler_cs_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)) or vector(0)",
+                     "interval": "1m",
+                     "legendFormat": "CS DOWN"
+                  }
+               ],
+               "title": "DOWN vServers Over Time",
+               "type": "timeseries"
+            },
+            {
+               "datasource": {
+                  "type": "datasource",
+                  "uid": "-- Mixed --"
+               },
+               "fieldConfig": {
+                  "defaults": {
+                     "color": {
+                        "mode": "palette-classic"
+                     },
+                     "unit": "short"
+                  }
+               },
+               "gridPos": {
+                  "h": 10,
+                  "w": 24,
+                  "x": 0,
+                  "y": 0
+               },
+               "id": 24,
+               "pluginVersion": "v11.4.0",
+               "targets": [
+                  {
+                     "datasource": {
+                        "type": "prometheus",
+                        "uid": "$datasource"
+                     },
+                     "expr": "count(max by (servicegroup, member, port, netscaler_cluster) (netscaler_servicegroup_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0)) or vector(0)",
+                     "interval": "1m",
+                     "legendFormat": "DOWN Members"
+                  }
+               ],
+               "title": "DOWN Service Group Members Over Time",
+               "type": "timeseries"
+            }
+         ],
+         "title": "Problem Trends",
+         "type": "row"
+      }
+   ],
+   "refresh": "1m",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "label": "Data source",
+            "name": "datasource",
+            "query": "prometheus",
+            "type": "datasource"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${datasource}"
+            },
+            "label": "Environment",
+            "name": "environment",
+            "query": "label_values(netscaler_ha_cur_state, deployment_environment_name)",
+            "refresh": "time",
+            "type": "query"
+         },
+         {
+            "datasource": {
+               "type": "prometheus",
+               "uid": "${datasource}"
+            },
+            "includeAll": true,
+            "label": "Cluster",
+            "multi": true,
+            "name": "netscaler_cluster",
+            "query": "label_values(netscaler_ha_cur_state{deployment_environment_name=~\"$environment\"}, netscaler_cluster)",
+            "refresh": "time",
+            "type": "query"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-1h",
+      "to": "now"
+   },
+   "timezone": "browser",
+   "title": "NetScaler Problems",
+   "uid": "netscaler-problems"
+}
