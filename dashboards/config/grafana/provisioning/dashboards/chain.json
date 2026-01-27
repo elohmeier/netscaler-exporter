@@ -254,10 +254,35 @@
          "title": "Chain Components",
          "transformations": [
             {
-               "id": "filterFieldsByName",
+               "id": "sortBy",
                "options": {
-                  "include": {
-                     "pattern": "^(title|node_type|state)$"
+                  "fields": { },
+                  "sort": [
+                     {
+                        "desc": true,
+                        "field": "Time"
+                     }
+                  ]
+               }
+            },
+            {
+               "id": "groupBy",
+               "options": {
+                  "fields": {
+                     "node_type": {
+                        "aggregations": [ ],
+                        "operation": "groupby"
+                     },
+                     "state": {
+                        "aggregations": [
+                           "first"
+                        ],
+                        "operation": "aggregate"
+                     },
+                     "title": {
+                        "aggregations": [ ],
+                        "operation": "groupby"
+                     }
                   }
                }
             },
@@ -266,12 +291,12 @@
                "options": {
                   "indexByName": {
                      "node_type": 0,
-                     "state": 2,
+                     "state (first)": 2,
                      "title": 1
                   },
                   "renameByName": {
                      "node_type": "Type",
-                     "state": "State",
+                     "state (first)": "State",
                      "title": "Component"
                   }
                }
@@ -773,7 +798,7 @@
                         "type": "prometheus",
                         "uid": "$datasource"
                      },
-                     "expr": "max by (title, state) (netscaler_topology_node{chain=~\".*$chain.*\",node_type=\"server\"})",
+                     "expr": "netscaler_topology_node{chain=~\".*$chain.*\",node_type=\"server\"}",
                      "format": "table",
                      "instant": true,
                      "interval": "1m",
@@ -783,10 +808,31 @@
                "title": "Backend Server States",
                "transformations": [
                   {
-                     "id": "filterFieldsByName",
+                     "id": "sortBy",
                      "options": {
-                        "include": {
-                           "pattern": "^(title|state)$"
+                        "fields": { },
+                        "sort": [
+                           {
+                              "desc": true,
+                              "field": "Time"
+                           }
+                        ]
+                     }
+                  },
+                  {
+                     "id": "groupBy",
+                     "options": {
+                        "fields": {
+                           "state": {
+                              "aggregations": [
+                                 "first"
+                              ],
+                              "operation": "aggregate"
+                           },
+                           "title": {
+                              "aggregations": [ ],
+                              "operation": "groupby"
+                           }
                         }
                      }
                   },
@@ -794,11 +840,11 @@
                      "id": "organize",
                      "options": {
                         "indexByName": {
-                           "state": 1,
+                           "state (first)": 1,
                            "title": 0
                         },
                         "renameByName": {
-                           "state": "State",
+                           "state (first)": "State",
                            "title": "Server"
                         }
                      }
@@ -873,7 +919,7 @@
                         "type": "prometheus",
                         "uid": "$datasource"
                      },
-                     "expr": "max by (title) (netscaler_topology_node{chain=~\".*$chain.*\",node_type=\"server\",state=\"DOWN\"})",
+                     "expr": "netscaler_topology_node{chain=~\".*$chain.*\",node_type=\"server\"}",
                      "format": "table",
                      "instant": true,
                      "interval": "1m",
@@ -883,16 +929,58 @@
                "title": "Down Servers",
                "transformations": [
                   {
-                     "id": "filterFieldsByName",
+                     "id": "sortBy",
                      "options": {
-                        "include": {
-                           "pattern": "^title$"
+                        "fields": { },
+                        "sort": [
+                           {
+                              "desc": true,
+                              "field": "Time"
+                           }
+                        ]
+                     }
+                  },
+                  {
+                     "id": "groupBy",
+                     "options": {
+                        "fields": {
+                           "state": {
+                              "aggregations": [
+                                 "first"
+                              ],
+                              "operation": "aggregate"
+                           },
+                           "title": {
+                              "aggregations": [ ],
+                              "operation": "groupby"
+                           }
                         }
+                     }
+                  },
+                  {
+                     "id": "filterByValue",
+                     "options": {
+                        "filters": [
+                           {
+                              "config": {
+                                 "id": "equal",
+                                 "options": {
+                                    "value": "DOWN"
+                                 }
+                              },
+                              "fieldName": "state (first)"
+                           }
+                        ],
+                        "match": "all",
+                        "type": "include"
                      }
                   },
                   {
                      "id": "organize",
                      "options": {
+                        "excludeByName": {
+                           "state (first)": true
+                        },
                         "renameByName": {
                            "title": "Server"
                         }

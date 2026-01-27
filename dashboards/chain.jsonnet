@@ -160,10 +160,23 @@ local chainComponentsTable =
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
+    // Sort by time descending so most recent state comes first
     {
-      id: 'filterFieldsByName',
+      id: 'sortBy',
       options: {
-        include: { pattern: '^(title|node_type|state)$' },
+        fields: {},
+        sort: [{ field: 'Time', desc: true }],
+      },
+    },
+    // Group by title+node_type, taking the first (most recent) state
+    {
+      id: 'groupBy',
+      options: {
+        fields: {
+          title: { aggregations: [], operation: 'groupby' },
+          node_type: { aggregations: [], operation: 'groupby' },
+          state: { aggregations: ['first'], operation: 'aggregate' },
+        },
       },
     },
     {
@@ -172,12 +185,12 @@ local chainComponentsTable =
         indexByName: {
           node_type: 0,
           title: 1,
-          state: 2,
+          'state (first)': 2,
         },
         renameByName: {
           title: 'Component',
           node_type: 'Type',
-          state: 'State',
+          'state (first)': 'State',
         },
       },
     },
@@ -348,14 +361,26 @@ local sgRow =
 local serverStatesTable =
   table.new('Backend Server States')
   + table.queryOptions.withTargets([
-    promQuery('max by (title, state) (netscaler_topology_node{chain=~".*$chain.*",node_type="server"})', '')
+    promQuery('netscaler_topology_node{chain=~".*$chain.*",node_type="server"}', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
+    // Sort by time descending so most recent state comes first
     {
-      id: 'filterFieldsByName',
+      id: 'sortBy',
       options: {
-        include: { pattern: '^(title|state)$' },
+        fields: {},
+        sort: [{ field: 'Time', desc: true }],
+      },
+    },
+    // Group by title, taking the first (most recent) state
+    {
+      id: 'groupBy',
+      options: {
+        fields: {
+          title: { aggregations: [], operation: 'groupby' },
+          state: { aggregations: ['first'], operation: 'aggregate' },
+        },
       },
     },
     {
@@ -363,11 +388,11 @@ local serverStatesTable =
       options: {
         indexByName: {
           title: 0,
-          state: 1,
+          'state (first)': 1,
         },
         renameByName: {
           title: 'Server',
-          state: 'State',
+          'state (first)': 'State',
         },
       },
     },
@@ -387,19 +412,48 @@ local serverHealthSummary =
 local serverDown =
   table.new('Down Servers')
   + table.queryOptions.withTargets([
-    promQuery('max by (title) (netscaler_topology_node{chain=~".*$chain.*",node_type="server",state="DOWN"})', '')
+    // Query all servers, then filter to current DOWN state in transformations
+    promQuery('netscaler_topology_node{chain=~".*$chain.*",node_type="server"}', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([
+    // Sort by time descending so most recent state comes first
     {
-      id: 'filterFieldsByName',
+      id: 'sortBy',
       options: {
-        include: { pattern: '^title$' },
+        fields: {},
+        sort: [{ field: 'Time', desc: true }],
+      },
+    },
+    // Group by title, taking the first (most recent) state
+    {
+      id: 'groupBy',
+      options: {
+        fields: {
+          title: { aggregations: [], operation: 'groupby' },
+          state: { aggregations: ['first'], operation: 'aggregate' },
+        },
+      },
+    },
+    // Filter to only show servers currently DOWN
+    {
+      id: 'filterByValue',
+      options: {
+        filters: [{
+          fieldName: 'state (first)',
+          config: {
+            id: 'equal',
+            options: { value: 'DOWN' },
+          },
+        }],
+        type: 'include',
+        match: 'all',
       },
     },
     {
       id: 'organize',
       options: {
+        excludeByName: { 'state (first)': true },
         renameByName: { title: 'Server' },
       },
     },
