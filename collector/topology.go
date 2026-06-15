@@ -15,10 +15,10 @@ import (
 
 // CSToLBMapping represents a resolved CS vserver → LB vserver relationship.
 type CSToLBMapping struct {
-	CSVServer   string
-	LBVServer   string
-	Priority    string
-	PolicyName  string // For policy-based routing
+	CSVServer  string
+	LBVServer  string
+	Priority   string
+	PolicyName string // For policy-based routing
 }
 
 func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {

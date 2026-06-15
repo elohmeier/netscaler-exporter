@@ -128,24 +128,24 @@ type Exporter struct {
 	gslbVirtualServersCurrentServerConnections *prometheus.GaugeVec
 
 	// CS Virtual Server metrics
-	csVirtualServersState                              *prometheus.GaugeVec
-	csVirtualServersTotalHits                          *prometheus.GaugeVec
-	csVirtualServersTotalRequests                      *prometheus.GaugeVec
-	csVirtualServersTotalResponses                     *prometheus.GaugeVec
-	csVirtualServersTotalRequestBytes                  *prometheus.GaugeVec
-	csVirtualServersTotalResponseBytes                 *prometheus.GaugeVec
-	csVirtualServersCurrentClientConnections           *prometheus.GaugeVec
-	csVirtualServersCurrentServerConnections           *prometheus.GaugeVec
-	csVirtualServersEstablishedConnections             *prometheus.GaugeVec
-	csVirtualServersTotalPacketsReceived               *prometheus.GaugeVec
-	csVirtualServersTotalPacketsSent                   *prometheus.GaugeVec
-	csVirtualServersTotalSpillovers                    *prometheus.GaugeVec
-	csVirtualServersDeferredRequests                   *prometheus.GaugeVec
-	csVirtualServersNumberInvalidRequestResponse       *prometheus.GaugeVec
+	csVirtualServersState                               *prometheus.GaugeVec
+	csVirtualServersTotalHits                           *prometheus.GaugeVec
+	csVirtualServersTotalRequests                       *prometheus.GaugeVec
+	csVirtualServersTotalResponses                      *prometheus.GaugeVec
+	csVirtualServersTotalRequestBytes                   *prometheus.GaugeVec
+	csVirtualServersTotalResponseBytes                  *prometheus.GaugeVec
+	csVirtualServersCurrentClientConnections            *prometheus.GaugeVec
+	csVirtualServersCurrentServerConnections            *prometheus.GaugeVec
+	csVirtualServersEstablishedConnections              *prometheus.GaugeVec
+	csVirtualServersTotalPacketsReceived                *prometheus.GaugeVec
+	csVirtualServersTotalPacketsSent                    *prometheus.GaugeVec
+	csVirtualServersTotalSpillovers                     *prometheus.GaugeVec
+	csVirtualServersDeferredRequests                    *prometheus.GaugeVec
+	csVirtualServersNumberInvalidRequestResponse        *prometheus.GaugeVec
 	csVirtualServersNumberInvalidRequestResponseDropped *prometheus.GaugeVec
-	csVirtualServersTotalVServerDownBackupHits         *prometheus.GaugeVec
-	csVirtualServersCurrentMultipathSessions           *prometheus.GaugeVec
-	csVirtualServersCurrentMultipathSubflows           *prometheus.GaugeVec
+	csVirtualServersTotalVServerDownBackupHits          *prometheus.GaugeVec
+	csVirtualServersCurrentMultipathSessions            *prometheus.GaugeVec
+	csVirtualServersCurrentMultipathSubflows            *prometheus.GaugeVec
 
 	// VPN Virtual Server metrics
 	vpnVirtualServersTotalRequests      *prometheus.GaugeVec
@@ -167,11 +167,11 @@ type Exporter struct {
 	topologyEdge *prometheus.GaugeVec
 
 	// Topology node stats (for node graph visualization)
-	topologyNodeState        *prometheus.GaugeVec
-	topologyNodeHealth       *prometheus.GaugeVec
+	topologyNodeState         *prometheus.GaugeVec
+	topologyNodeHealth        *prometheus.GaugeVec
 	topologyNodeRequestsTotal *prometheus.GaugeVec
-	topologyNodeConnections  *prometheus.GaugeVec
-	topologyNodeTTFBMs       *prometheus.GaugeVec
+	topologyNodeConnections   *prometheus.GaugeVec
+	topologyNodeTTFBMs        *prometheus.GaugeVec
 
 	// Protocol HTTP metrics
 	httpTotalRequests              *prometheus.Desc
@@ -334,14 +334,14 @@ type Exporter struct {
 	capacityBandwidth       *prometheus.Desc
 
 	// MPS Health metrics
-	mpsHealthCPUUsage      *prometheus.GaugeVec
-	mpsHealthDiskUsage     *prometheus.GaugeVec
-	mpsHealthDiskFree      *prometheus.GaugeVec
-	mpsHealthDiskTotal     *prometheus.GaugeVec
-	mpsHealthDiskUsed      *prometheus.GaugeVec
-	mpsHealthMemoryUsage   *prometheus.GaugeVec
-	mpsHealthMemoryFree    *prometheus.GaugeVec
-	mpsHealthMemoryTotal   *prometheus.GaugeVec
+	mpsHealthCPUUsage    *prometheus.GaugeVec
+	mpsHealthDiskUsage   *prometheus.GaugeVec
+	mpsHealthDiskFree    *prometheus.GaugeVec
+	mpsHealthDiskTotal   *prometheus.GaugeVec
+	mpsHealthDiskUsed    *prometheus.GaugeVec
+	mpsHealthMemoryUsage *prometheus.GaugeVec
+	mpsHealthMemoryFree  *prometheus.GaugeVec
+	mpsHealthMemoryTotal *prometheus.GaugeVec
 
 	// HA (High Availability) metrics
 	haNodeState              *prometheus.GaugeVec // Per-node: 1=Primary, 0=Secondary
@@ -395,16 +395,16 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		logger:      logger,
 
 		// System metrics (descriptors)
-		modelID:             prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "model_id"), "NetScaler model - reflects the bandwidth available", baseLabels, nil),
-		mgmtCPUUsage:        prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "mgmt_cpu_usage"), "Current CPU utilisation for management", baseLabels, nil),
-		memUsage:            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "mem_usage"), "Current memory utilisation", baseLabels, nil),
-		pktCPUUsage:         prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "pkt_cpu_usage"), "Current CPU utilisation for packet engines", baseLabels, nil),
-		flashPartitionUsage: prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "flash_partition_usage"), "Used space in /flash partition", baseLabels, nil),
-		varPartitionUsage:   prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "var_partition_usage"), "Used space in /var partition", baseLabels, nil),
-		totRxMB:             prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "total_received_mb"), "Total Megabytes received", baseLabels, nil),
-		totTxMB:             prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "total_transmit_mb"), "Total Megabytes transmitted", baseLabels, nil),
-		httpRequests:        prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_requests"), "Total HTTP requests received", baseLabels, nil),
-		httpResponses:       prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_responses"), "Total HTTP responses sent", baseLabels, nil),
+		modelID:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "model_id"), "NetScaler model - reflects the bandwidth available", baseLabels, nil),
+		mgmtCPUUsage:                           prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "mgmt_cpu_usage"), "Current CPU utilisation for management", baseLabels, nil),
+		memUsage:                               prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "mem_usage"), "Current memory utilisation", baseLabels, nil),
+		pktCPUUsage:                            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "pkt_cpu_usage"), "Current CPU utilisation for packet engines", baseLabels, nil),
+		flashPartitionUsage:                    prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "flash_partition_usage"), "Used space in /flash partition", baseLabels, nil),
+		varPartitionUsage:                      prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "var_partition_usage"), "Used space in /var partition", baseLabels, nil),
+		totRxMB:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "total_received_mb"), "Total Megabytes received", baseLabels, nil),
+		totTxMB:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "total_transmit_mb"), "Total Megabytes transmitted", baseLabels, nil),
+		httpRequests:                           prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_requests"), "Total HTTP requests received", baseLabels, nil),
+		httpResponses:                          prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_responses"), "Total HTTP responses sent", baseLabels, nil),
 		tcpCurrentClientConnections:            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_current_client_connections"), "Current client connections", baseLabels, nil),
 		tcpCurrentClientConnectionsEstablished: prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_current_client_connections_established"), "Current established client connections", baseLabels, nil),
 		tcpCurrentServerConnections:            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_current_server_connections"), "Current server connections", baseLabels, nil),

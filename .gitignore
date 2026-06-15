@@ -1,3 +1,7 @@
 *.mitmlog
 netscaler-exporter
 dashboards/vendor
+dist/
+node_modules/
+coverage.out
+*.test

@@ -1,10 +1,39 @@
 version: 2
 
+project_name: netscaler-exporter
+
 builds:
-  - ldflags: -s -w -X main.version={{.Version}}
-    env: [CGO_ENABLED=0]
-    goos: [linux, darwin]
-    goarch: [amd64, arm64]
+  - id: netscaler-exporter
+    main: .
+    binary: netscaler-exporter
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.build={{.ShortCommit}}
+
+archives:
+  - id: default
+    ids:
+      - netscaler-exporter
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+source:
+  enabled: true
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
 
 dockers_v2:
   - images:
@@ -15,3 +44,6 @@ dockers_v2:
     platforms:
       - linux/amd64
       - linux/arm64
+
+release:
+  mode: keep-existing
