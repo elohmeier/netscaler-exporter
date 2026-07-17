@@ -499,6 +499,44 @@ type CSActionResponse struct {
 	CSActions []CSAction `json:"csaction,omitempty"`
 }
 
+// LBVServerRewritePolicyBinding represents a rewrite policy bound to an LB virtual server.
+type LBVServerRewritePolicyBinding struct {
+	Name       string `json:"name"`       // LB virtual server name
+	PolicyName string `json:"policyname"` // Rewrite policy name
+	Priority   string `json:"priority"`   // Binding priority
+	BindPoint  string `json:"bindpoint"`  // REQUEST, RESPONSE, or another supported bind point
+}
+
+// RewritePolicy represents a rewrite policy and its referenced action.
+type RewritePolicy struct {
+	Name   string `json:"name"`
+	Rule   string `json:"rule"`
+	Action string `json:"action"`
+}
+
+// RewriteAction represents a rewrite action.
+type RewriteAction struct {
+	Name              string `json:"name"`
+	Type              string `json:"type"`
+	Target            string `json:"target"`
+	StringBuilderExpr string `json:"stringbuilderexpr"`
+}
+
+// BulkLBVServerRewritePolicyBindingResponse is returned by the bulk LB rewrite binding endpoint.
+type BulkLBVServerRewritePolicyBindingResponse struct {
+	LBVServerRewritePolicyBindings []LBVServerRewritePolicyBinding `json:"lbvserver_rewritepolicy_binding,omitempty"`
+}
+
+// RewritePolicyResponse is returned by the rewritepolicy config endpoint.
+type RewritePolicyResponse struct {
+	RewritePolicies []RewritePolicy `json:"rewritepolicy,omitempty"`
+}
+
+// RewriteActionResponse is returned by the rewriteaction config endpoint.
+type RewriteActionResponse struct {
+	RewriteActions []RewriteAction `json:"rewriteaction,omitempty"`
+}
+
 // HANodeConfig represents the data returned from the /config/hanode Nitro API endpoint
 type HANodeConfig struct {
 	ID              string `json:"id"`

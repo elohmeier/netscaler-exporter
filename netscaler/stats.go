@@ -235,6 +235,51 @@ func GetAllCSActions(ctx context.Context, c *NitroClient) ([]CSAction, error) {
 	return response.CSActions, nil
 }
 
+// GetAllLBVServerRewritePolicyBindings retrieves rewrite policy bindings for all LB virtual servers.
+func GetAllLBVServerRewritePolicyBindings(ctx context.Context, c *NitroClient) ([]LBVServerRewritePolicyBinding, error) {
+	body, err := c.GetConfig(ctx, "lbvserver_rewritepolicy_binding", "bulkbindings=yes")
+	if err != nil {
+		return nil, fmt.Errorf("error getting bulk lbvserver_rewritepolicy_binding: %w", err)
+	}
+
+	var response BulkLBVServerRewritePolicyBindingResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling lbvserver_rewritepolicy_binding response: %w", err)
+	}
+
+	return response.LBVServerRewritePolicyBindings, nil
+}
+
+// GetAllRewritePolicies retrieves all rewrite policies.
+func GetAllRewritePolicies(ctx context.Context, c *NitroClient) ([]RewritePolicy, error) {
+	body, err := c.GetConfig(ctx, "rewritepolicy", "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting rewritepolicy: %w", err)
+	}
+
+	var response RewritePolicyResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling rewritepolicy response: %w", err)
+	}
+
+	return response.RewritePolicies, nil
+}
+
+// GetAllRewriteActions retrieves all rewrite actions.
+func GetAllRewriteActions(ctx context.Context, c *NitroClient) ([]RewriteAction, error) {
+	body, err := c.GetConfig(ctx, "rewriteaction", "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting rewriteaction: %w", err)
+	}
+
+	var response RewriteActionResponse
+	if err = json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshalling rewriteaction response: %w", err)
+	}
+
+	return response.RewriteActions, nil
+}
+
 // GetProtocolHTTPStats queries the Nitro API for protocol HTTP stats
 func GetProtocolHTTPStats(ctx context.Context, c *NitroClient, querystring string) (NSAPIResponse, error) {
 	return getStats(ctx, c, "protocolhttp", querystring)

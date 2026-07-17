@@ -198,6 +198,57 @@ local chainComponentsTable =
   + { gridPos: { h: 16, w: 12, x: 12, y: 9 } };
 
 // ============================================================================
+// HTTP Host Rewrite Row
+// ============================================================================
+// Configuration-only view of request Host rewrites. A missing row means the
+// selected LB vServer has no static Host replacement exported by NetScaler.
+local hostRewriteTable =
+  table.new('HTTP Host Rewrites')
+  + table.panelOptions.withDescription('Static request-side Host replacements used to select downstream routes')
+  + table.queryOptions.withTargets([
+    promQuery(
+      'max by (virtual_server, policy, priority, rule, action, host) (netscaler_lb_vserver_http_host_rewrite_info{deployment_environment_name=~"$environment",virtual_server=~"$lbvserver"})',
+      ''
+    )
+    + { format: 'table', instant: true, refId: 'A' },
+  ])
+  + table.queryOptions.withTransformations([
+    {
+      id: 'filterFieldsByName',
+      options: {
+        include: { pattern: '^(virtual_server|rule|host|policy|action|priority)$' },
+      },
+    },
+    {
+      id: 'organize',
+      options: {
+        indexByName: {
+          virtual_server: 0,
+          rule: 1,
+          host: 2,
+          policy: 3,
+          action: 4,
+          priority: 5,
+        },
+        renameByName: {
+          virtual_server: 'LB vServer',
+          rule: 'Match Rule',
+          host: 'Rewritten Host',
+          policy: 'Policy',
+          action: 'Action',
+          priority: 'Priority',
+        },
+      },
+    },
+  ])
+  + table.gridPos.withW(24)
+  + table.gridPos.withH(8);
+
+local hostRewriteRow =
+  row.new('HTTP Host Rewrites')
+  + row.withPanels([hostRewriteTable]);
+
+// ============================================================================
 // LB Virtual Servers Row
 // ============================================================================
 local lbStatesTable =
@@ -483,6 +534,7 @@ local topologyPanels = [
 
 // Other rows use grid layout starting at y=25 (after topology section)
 local otherRows = g.util.grid.makeGrid([
+  hostRewriteRow,
   lbRow,
   sgRow,
   serverRow,

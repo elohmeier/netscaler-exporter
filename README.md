@@ -7,6 +7,7 @@ Prometheus exporter for Citrix NetScaler (ADC) and Citrix ADM (MPS) metrics via 
 - Support for both ADC (NetScaler) and MPS (Citrix ADM) targets
 - Flexible custom labels for metric identification
 - Topology metrics for service graph visualization
+- Static LB request Host rewrites for routing correlation
 - Configurable module disabling for unsupported collectors
 
 ## Quick Start
@@ -100,6 +101,7 @@ Use `-disabled-modules` to skip collectors that aren't supported by your device:
 | `vpn_vservers` | VPN virtual servers |
 | `aaa_stats` | Authentication stats |
 | `topology` | Topology relationships |
+| `rewrite_policies` | Static request-side Host rewrites on LB virtual servers |
 | `protocol_http` | HTTP protocol stats |
 | `protocol_tcp` | TCP protocol stats |
 | `protocol_ip` | IP protocol stats |
@@ -131,6 +133,32 @@ All metrics include any custom labels defined via `-labels`.
 - **AAA**: Authentication metrics
 - **Interfaces**: Per-interface traffic statistics
 - **Topology**: Node and edge metrics for service graph visualization
+- **Rewrite policies**: Static request-side Host replacements bound to LB virtual servers
+
+### HTTP Host Rewrite Mapping
+
+The `rewrite_policies` module resolves LB vServer rewrite bindings through their policies and actions. It exports only request-side `replace` actions whose target is the HTTP `Host` header and whose replacement is a static hostname:
+
+```text
+netscaler_lb_vserver_http_host_rewrite_info{
+  virtual_server="public-apps-vserver",
+  policy="catalog-host-rewrite",
+  priority="100",
+  rule="HTTP.REQ.HEADER(\"Host\").EQ(\"legacy.example.com\") && HTTP.REQ.URL.STARTSWITH(\"/catalog\")",
+  action="set-catalog-host",
+  host="catalog.apps.example.com"
+} 1
+```
+
+The normalized `host` label can be joined with an OpenShift route information metric when both are available in the same Prometheus-compatible datasource:
+
+```promql
+netscaler_lb_vserver_http_host_rewrite_info
+  * on (host) group_left(namespace, route)
+    max by (host, namespace, route) (openshift_route_info)
+```
+
+Dynamic rewrite expressions and rewrites of headers other than `Host` are intentionally omitted. Disable the collector with `-disabled-modules rewrite_policies` if the ADC version or API user does not support the rewrite configuration endpoints.
 
 ### MPS (Citrix ADM) Metrics
 

@@ -173,6 +173,9 @@ type Exporter struct {
 	topologyNodeConnections   *prometheus.GaugeVec
 	topologyNodeTTFBMs        *prometheus.GaugeVec
 
+	// Static request-side Host rewrites bound to LB virtual servers
+	lbVServerHTTPHostRewriteInfo *prometheus.GaugeVec
+
 	// Protocol HTTP metrics
 	httpTotalRequests              *prometheus.Desc
 	httpTotalResponses             *prometheus.Desc
@@ -372,6 +375,7 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 	topoEdgeLabels := append(baseLabels, "id", "source", "target", "weight", "priority", "chain",
 		"mainstat", "secondarystat")
 	topoNodeStatsLabels := append(baseLabels, "id", "node_type", "chain")
+	rewriteInfoLabels := append(baseLabels, "virtual_server", "policy", "priority", "rule", "action", "host")
 	sslCertLabels := append(baseLabels, "certkey")
 	sslVsLabels := append(baseLabels, "vserver", "type", "ip")
 	cpuCoreLabels := append(baseLabels, "core_id")
@@ -535,6 +539,13 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		topologyNodeRequestsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_requests_total", Help: "Total requests processed by node"}, topoNodeStatsLabels),
 		topologyNodeConnections:   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_connections", Help: "Current client connections to node"}, topoNodeStatsLabels),
 		topologyNodeTTFBMs:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_ttfb_ms", Help: "Average time to first byte in milliseconds"}, topoNodeStatsLabels),
+
+		// Static LB request Host rewrites
+		lbVServerHTTPHostRewriteInfo: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: metricsNamespace,
+			Name:      "lb_vserver_http_host_rewrite_info",
+			Help:      "Static request-side Host header rewrite configured on an LB virtual server",
+		}, rewriteInfoLabels),
 
 		// Protocol HTTP metrics
 		httpTotalRequests:              prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_requests_total"), "Total HTTP requests", baseLabels, nil),
@@ -877,6 +888,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.topologyNodeRequestsTotal.Describe(ch)
 	e.topologyNodeConnections.Describe(ch)
 	e.topologyNodeTTFBMs.Describe(ch)
+	e.lbVServerHTTPHostRewriteInfo.Describe(ch)
 
 	// Protocol HTTP metrics
 	ch <- e.httpTotalRequests

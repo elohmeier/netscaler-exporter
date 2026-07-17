@@ -314,6 +314,81 @@
          },
          "id": 7,
          "panels": [ ],
+         "title": "HTTP Host Rewrites",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "description": "Static request-side Host replacements used to select downstream routes",
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 26
+         },
+         "id": 8,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "$datasource"
+               },
+               "expr": "max by (virtual_server, policy, priority, rule, action, host) (netscaler_lb_vserver_http_host_rewrite_info{deployment_environment_name=~\"$environment\",virtual_server=~\"$lbvserver\"})",
+               "format": "table",
+               "instant": true,
+               "interval": "1m",
+               "legendFormat": "",
+               "refId": "A"
+            }
+         ],
+         "title": "HTTP Host Rewrites",
+         "transformations": [
+            {
+               "id": "filterFieldsByName",
+               "options": {
+                  "include": {
+                     "pattern": "^(virtual_server|rule|host|policy|action|priority)$"
+                  }
+               }
+            },
+            {
+               "id": "organize",
+               "options": {
+                  "indexByName": {
+                     "action": 4,
+                     "host": 2,
+                     "policy": 3,
+                     "priority": 5,
+                     "rule": 1,
+                     "virtual_server": 0
+                  },
+                  "renameByName": {
+                     "action": "Action",
+                     "host": "Rewritten Host",
+                     "policy": "Policy",
+                     "priority": "Priority",
+                     "rule": "Match Rule",
+                     "virtual_server": "LB vServer"
+                  }
+               }
+            }
+         ],
+         "type": "table"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 34
+         },
+         "id": 9,
+         "panels": [ ],
          "title": "LB Virtual Servers",
          "type": "row"
       },
@@ -326,9 +401,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 26
+            "y": 35
          },
-         "id": 8,
+         "id": 10,
          "pluginVersion": "v11.4.0",
          "targets": [
             {
@@ -424,9 +499,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 34
+            "y": 43
          },
-         "id": 9,
+         "id": 11,
          "options": {
             "displayMode": "gradient",
             "orientation": "horizontal"
@@ -460,9 +535,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 51
          },
-         "id": 10,
+         "id": 12,
          "pluginVersion": "v11.4.0",
          "targets": [
             {
@@ -501,9 +576,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 59
          },
-         "id": 11,
+         "id": 13,
          "pluginVersion": "v11.4.0",
          "targets": [
             {
@@ -533,9 +608,9 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 58
+            "y": 67
          },
-         "id": 12,
+         "id": 14,
          "pluginVersion": "v11.4.0",
          "targets": [
             {
@@ -566,9 +641,9 @@
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 66
+            "y": 75
          },
-         "id": 13,
+         "id": 15,
          "panels": [
             {
                "datasource": {
@@ -581,7 +656,7 @@
                   "x": 0,
                   "y": 0
                },
-               "id": 14,
+               "id": 16,
                "pluginVersion": "v11.4.0",
                "targets": [
                   {
@@ -681,7 +756,7 @@
                   "x": 0,
                   "y": 0
                },
-               "id": 15,
+               "id": 17,
                "options": {
                   "displayMode": "gradient",
                   "orientation": "horizontal"
@@ -717,7 +792,7 @@
                   "x": 0,
                   "y": 0
                },
-               "id": 16,
+               "id": 18,
                "pluginVersion": "v11.4.0",
                "targets": [
                   {
@@ -749,7 +824,7 @@
                   "x": 0,
                   "y": 0
                },
-               "id": 17,
+               "id": 19,
                "pluginVersion": "v11.4.0",
                "targets": [
                   {
@@ -775,9 +850,9 @@
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 67
+            "y": 76
          },
-         "id": 18,
+         "id": 20,
          "panels": [
             {
                "datasource": {
@@ -790,7 +865,7 @@
                   "x": 0,
                   "y": 0
                },
-               "id": 19,
+               "id": 21,
                "pluginVersion": "v11.4.0",
                "targets": [
                   {
@@ -863,7 +938,7 @@
                   "x": 0,
                   "y": 0
                },
-               "id": 20,
+               "id": 22,
                "options": {
                   "colorMode": "none",
                   "graphMode": "none"
@@ -911,7 +986,7 @@
                   "x": 0,
                   "y": 0
                },
-               "id": 21,
+               "id": 23,
                "pluginVersion": "v11.4.0",
                "targets": [
                   {

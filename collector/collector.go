@@ -61,6 +61,11 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.collectTopologyMetrics(ctx, nsClient, ch)
 	}
 
+	// Static request-side Host rewrite configuration for LB virtual servers.
+	run("rewrite_policies", func() {
+		e.collectHTTPHostRewriteInfo(ctx, nsClient, ch)
+	})
+
 	// 1. NS Stats
 	run("ns_stats", func() {
 		ns, err := netscaler.GetNSStats(ctx, nsClient, "")
