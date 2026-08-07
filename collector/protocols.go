@@ -10,11 +10,11 @@ import (
 )
 
 // collectProtocolHTTPStats collects protocol HTTP statistics
-func (e *Exporter) collectProtocolHTTPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectProtocolHTTPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetProtocolHTTPStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get protocol HTTP stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	baseLabels := e.buildLabelValues()
@@ -69,14 +69,15 @@ func (e *Exporter) collectProtocolHTTPStats(ctx context.Context, nsClient *netsc
 	e.sendMetric(ch, e.httpErrIncompleteRequestsRate, http.ErrIncompleteRequestsRate, baseLabels)
 	e.sendMetric(ch, e.httpErrIncompleteResponsesRate, http.ErrIncompleteResponsesRate, baseLabels)
 	e.sendMetric(ch, e.httpErrServerBusyRate, http.ErrServerBusyRate, baseLabels)
+	return true
 }
 
 // collectProtocolTCPStats collects protocol TCP statistics
-func (e *Exporter) collectProtocolTCPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectProtocolTCPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetProtocolTCPStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get protocol TCP stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	baseLabels := e.buildLabelValues()
@@ -111,14 +112,15 @@ func (e *Exporter) collectProtocolTCPStats(ctx context.Context, nsClient *netsca
 	e.sendMetric(ch, e.tcpErrRstThreshold, tcp.ErrRstThreshold, baseLabels)
 	e.sendMetric(ch, e.tcpSynRate, tcp.SynRate, baseLabels)
 	e.sendMetric(ch, e.tcpSynProbeRate, tcp.SynProbeRate, baseLabels)
+	return true
 }
 
 // collectProtocolIPStats collects protocol IP statistics
-func (e *Exporter) collectProtocolIPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectProtocolIPStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetProtocolIPStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get protocol IP stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	baseLabels := e.buildLabelValues()
@@ -163,6 +165,7 @@ func (e *Exporter) collectProtocolIPStats(ctx context.Context, nsClient *netscal
 	e.sendMetric(ch, e.ipTxMbitsRate, ip.TxMbitsRate, baseLabels)
 	e.sendMetric(ch, e.ipRoutedPacketsRate, ip.RoutedPacketsRate, baseLabels)
 	e.sendMetric(ch, e.ipRoutedMbitsRate, ip.RoutedMbitsRate, baseLabels)
+	return true
 }
 
 // sendMetric is a helper to parse and send a metric value.

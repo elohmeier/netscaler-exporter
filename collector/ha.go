@@ -10,8 +10,9 @@ import (
 )
 
 // collectHAStats collects HA (High Availability) metrics from both config and stat endpoints
-func (e *Exporter) collectHAStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectHAStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	baseLabels := e.buildLabelValues()
+	succeeded := true
 
 	// Reset GaugeVec metrics
 	e.haNodeState.Reset()
@@ -23,6 +24,7 @@ func (e *Exporter) collectHAStats(ctx context.Context, nsClient *netscaler.Nitro
 	haConfig, err := netscaler.GetHANodeConfig(ctx, nsClient)
 	if err != nil {
 		e.logger.Error("failed to get HA node config", "url", e.url, "err", err)
+		succeeded = false
 	} else {
 		for _, node := range haConfig.HANodes {
 			labels := e.buildLabelValues(node.ID, node.Name, node.IPAddress)
@@ -63,7 +65,7 @@ func (e *Exporter) collectHAStats(ctx context.Context, nsClient *netscaler.Nitro
 	haStats, err := netscaler.GetHANodeStats(ctx, nsClient)
 	if err != nil {
 		e.logger.Error("failed to get HA node stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	// Current state: 1=UP, 0=DOWN
@@ -88,4 +90,5 @@ func (e *Exporter) collectHAStats(ctx context.Context, nsClient *netscaler.Nitro
 	// Propagation timeouts total
 	propTimeouts, _ := strconv.ParseFloat(haStats.HANode.HAErrPropTimeout, 64)
 	ch <- prometheus.MustNewConstMetric(e.haPropTimeoutsTotal, prometheus.CounterValue, propTimeouts, baseLabels...)
+	return succeeded
 }

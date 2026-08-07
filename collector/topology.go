@@ -21,7 +21,7 @@ type CSToLBMapping struct {
 	PolicyName string // For policy-based routing
 }
 
-func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	e.topologyNode.Reset()
 	e.topologyEdge.Reset()
 	e.topologyNodeState.Reset()
@@ -37,6 +37,13 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	var allCsPolicyBindings []netscaler.CSVServerCSPolicyBinding
 	var allCsPolicies []netscaler.CSPolicy
 	var allCsActions []netscaler.CSAction
+	succeeded := true
+	var succeededMu sync.Mutex
+	markFailed := func() {
+		succeededMu.Lock()
+		succeeded = false
+		succeededMu.Unlock()
+	}
 
 	var bindingsWg sync.WaitGroup
 	bindingsWg.Add(6)
@@ -46,6 +53,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		bindings, err := netscaler.GetAllLBVServerServiceBindings(ctx, nsClient)
 		if err != nil {
 			e.logger.Debug("error getting bulk service bindings", "url", e.url, "err", err)
+			markFailed()
 			return
 		}
 		allSvcBindings = bindings
@@ -56,6 +64,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		bindings, err := netscaler.GetAllLBVServerServiceGroupBindings(ctx, nsClient)
 		if err != nil {
 			e.logger.Debug("error getting bulk servicegroup bindings", "url", e.url, "err", err)
+			markFailed()
 			return
 		}
 		allSgBindings = bindings
@@ -66,6 +75,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		bindings, err := netscaler.GetAllCSVServerLBVServerBindings(ctx, nsClient)
 		if err != nil {
 			e.logger.Debug("error getting bulk csvserver_lbvserver bindings", "url", e.url, "err", err)
+			markFailed()
 			return
 		}
 		allCsLbBindings = bindings
@@ -76,6 +86,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		bindings, err := netscaler.GetAllCSVServerCSPolicyBindings(ctx, nsClient)
 		if err != nil {
 			e.logger.Debug("error getting bulk csvserver_cspolicy bindings", "url", e.url, "err", err)
+			markFailed()
 			return
 		}
 		allCsPolicyBindings = bindings
@@ -86,6 +97,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		policies, err := netscaler.GetAllCSPolicies(ctx, nsClient)
 		if err != nil {
 			e.logger.Debug("error getting cspolicies", "url", e.url, "err", err)
+			markFailed()
 			return
 		}
 		allCsPolicies = policies
@@ -96,6 +108,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 		actions, err := netscaler.GetAllCSActions(ctx, nsClient)
 		if err != nil {
 			e.logger.Debug("error getting csactions", "url", e.url, "err", err)
+			markFailed()
 			return
 		}
 		allCsActions = actions
@@ -146,6 +159,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	lbVServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("error getting LB vserver stats for topology", "url", e.url, "err", err)
+		markFailed()
 	} else {
 		for _, vs := range lbVServers.VirtualServerStats {
 			nodeID := "lbvserver:" + vs.Name
@@ -188,6 +202,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	csVServers, err := netscaler.GetCSVirtualServerStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("error getting CS vserver stats for topology", "url", e.url, "err", err)
+		markFailed()
 	} else {
 		for _, vs := range csVServers.CSVirtualServerStats {
 			nodeID := "csvserver:" + vs.Name
@@ -227,6 +242,7 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	services, err := netscaler.GetServiceStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("error getting service stats for topology", "url", e.url, "err", err)
+		markFailed()
 	} else {
 		for _, svc := range services.ServiceStats {
 			nodeID := "service:" + svc.Name
@@ -306,6 +322,9 @@ func (e *Exporter) collectTopologyMetrics(ctx context.Context, nsClient *netscal
 	}
 
 	// Note: Collect() is called later in scrapeADC after service_groups has added its nodes/edges
+	succeededMu.Lock()
+	defer succeededMu.Unlock()
+	return succeeded
 }
 
 // resolveCSToLBMappings resolves all CS vserver → LB vserver relationships from multiple sources:

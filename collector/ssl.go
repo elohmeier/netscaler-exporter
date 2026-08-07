@@ -10,11 +10,11 @@ import (
 )
 
 // collectSSLStats collects SSL global statistics
-func (e *Exporter) collectSSLStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSSLStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetSSLStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get SSL stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	baseLabels := e.buildLabelValues()
@@ -35,14 +35,15 @@ func (e *Exporter) collectSSLStats(ctx context.Context, nsClient *netscaler.Nitr
 	e.sendMetric(ch, e.sslEncRate, ssl.EncRate, baseLabels)
 	e.sendMetric(ch, e.sslSSLv2HandshakesRate, ssl.SSLv2HandshakesRate, baseLabels)
 	e.sendMetric(ch, e.sslNewSessionsRate, ssl.NewSessionsRate, baseLabels)
+	return true
 }
 
 // collectSSLCertKeys collects SSL certificate expiration metrics
-func (e *Exporter) collectSSLCertKeys(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSSLCertKeys(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetSSLCertKeys(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get SSL cert keys", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	e.sslCertDaysToExpire.Reset()
@@ -52,14 +53,15 @@ func (e *Exporter) collectSSLCertKeys(ctx context.Context, nsClient *netscaler.N
 		e.sslCertDaysToExpire.WithLabelValues(labels...).Set(val)
 	}
 	e.sslCertDaysToExpire.Collect(ch)
+	return true
 }
 
 // collectSSLVServerStats collects SSL virtual server statistics
-func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetSSLVServerStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get SSL vserver stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	// Reset all gauges
@@ -124,14 +126,15 @@ func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscal
 	e.sslVServerHWDecBytesRate.Collect(ch)
 	e.sslVServerSessionNewRate.Collect(ch)
 	e.sslVServerSessionHitsRate.Collect(ch)
+	return true
 }
 
 // collectSystemCPUStats collects per-core CPU statistics
-func (e *Exporter) collectSystemCPUStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectSystemCPUStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetSystemCPUStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get system CPU stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	e.cpuCoreUsage.Reset()
@@ -141,14 +144,15 @@ func (e *Exporter) collectSystemCPUStats(ctx context.Context, nsClient *netscale
 		e.cpuCoreUsage.WithLabelValues(labels...).Set(val)
 	}
 	e.cpuCoreUsage.Collect(ch)
+	return true
 }
 
 // collectNSCapacityStats collects bandwidth capacity statistics
-func (e *Exporter) collectNSCapacityStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectNSCapacityStats(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	stats, err := netscaler.GetNSCapacityStats(ctx, nsClient, "")
 	if err != nil {
 		e.logger.Error("failed to get bandwidth capacity stats", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	baseLabels := e.buildLabelValues()
@@ -158,6 +162,7 @@ func (e *Exporter) collectNSCapacityStats(ctx context.Context, nsClient *netscal
 	e.sendMetric(ch, e.capacityMinBandwidth, cap.MinBandwidth, baseLabels)
 	e.sendMetric(ch, e.capacityActualBandwidth, cap.ActualBandwidth, baseLabels)
 	e.sendMetric(ch, e.capacityBandwidth, cap.Bandwidth, baseLabels)
+	return true
 }
 
 // setGaugeVal is a helper to set a gauge value

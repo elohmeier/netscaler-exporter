@@ -9,7 +9,16 @@ import (
 	"github.com/elohmeier/netscaler-exporter/netscaler"
 )
 
-const metricsNamespace = "netscaler"
+const (
+	metricsNamespace         = "netscaler"
+	exporterMetricsNamespace = "netscaler_exporter"
+)
+
+// BuildInfo identifies the exporter binary.
+type BuildInfo struct {
+	Version  string
+	Revision string
+}
 
 // Exporter represents the metrics exported to Prometheus
 type Exporter struct {
@@ -23,6 +32,7 @@ type Exporter struct {
 	parallelism int
 	labelKeys   []string
 	logger      *slog.Logger
+	buildInfo   BuildInfo
 
 	// Chain membership for topology filtering (nodeID → comma-separated chain names)
 	chainMembership map[string]string
@@ -30,6 +40,12 @@ type Exporter struct {
 	// Persistent clients for session-based authentication
 	nsClient  *netscaler.NitroClient
 	mpsClient *netscaler.MPSClient
+
+	// Exporter self-metrics
+	scrapeSuccess    *prometheus.Desc
+	collectorSuccess *prometheus.Desc
+	scrapeDuration   *prometheus.Desc
+	build            *prometheus.Desc
 
 	// System metrics (descriptors)
 	modelID                                *prometheus.Desc
@@ -359,8 +375,12 @@ type Exporter struct {
 }
 
 // NewExporter initialises the exporter with the given configuration
-func NewExporter(cfg *config.Config, url, targetType, username, password string, ignoreCert bool, caFile string, parallelism int, logger *slog.Logger) (*Exporter, error) {
+func NewExporter(cfg *config.Config, url, targetType, username, password string, ignoreCert bool, caFile string, parallelism int, logger *slog.Logger, buildInfo ...BuildInfo) (*Exporter, error) {
 	labelKeys := cfg.LabelKeys()
+	var exporterBuildInfo BuildInfo
+	if len(buildInfo) > 0 {
+		exporterBuildInfo = buildInfo[0]
+	}
 
 	// Build base label names for different metric types
 	baseLabels := labelKeys
@@ -397,6 +417,33 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		parallelism: parallelism,
 		labelKeys:   labelKeys,
 		logger:      logger,
+		buildInfo:   exporterBuildInfo,
+
+		// Exporter self-metrics
+		scrapeSuccess: prometheus.NewDesc(
+			prometheus.BuildFQName(exporterMetricsNamespace, "", "scrape_success"),
+			"Whether the last scrape of all enabled collectors succeeded (1 for success, 0 for failure).",
+			nil,
+			nil,
+		),
+		collectorSuccess: prometheus.NewDesc(
+			prometheus.BuildFQName(exporterMetricsNamespace, "", "collector_success"),
+			"Whether an enabled collector succeeded during the last scrape (1 for success, 0 for failure).",
+			[]string{"collector"},
+			nil,
+		),
+		scrapeDuration: prometheus.NewDesc(
+			prometheus.BuildFQName(exporterMetricsNamespace, "", "scrape_duration_seconds"),
+			"Duration of the last exporter scrape in seconds.",
+			nil,
+			nil,
+		),
+		build: prometheus.NewDesc(
+			prometheus.BuildFQName(exporterMetricsNamespace, "", "build_info"),
+			"Build information about the NetScaler exporter.",
+			[]string{"version", "revision", "target_type"},
+			nil,
+		),
 
 		// System metrics (descriptors)
 		modelID:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "model_id"), "NetScaler model - reflects the bandwidth available", baseLabels, nil),
@@ -760,6 +807,11 @@ func (e *Exporter) buildLabelValues(extraLabels ...string) []string {
 
 // Describe implements Collector
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+	ch <- e.scrapeSuccess
+	ch <- e.collectorSuccess
+	ch <- e.scrapeDuration
+	ch <- e.build
+
 	ch <- e.modelID
 	ch <- e.mgmtCPUUsage
 	ch <- e.memUsage

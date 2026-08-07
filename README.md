@@ -109,6 +109,8 @@ Use `-disabled-modules` to skip collectors that aren't supported by your device:
 | `ssl_certs` | SSL certificates |
 | `ssl_vservers` | SSL virtual servers |
 | `system_cpu` | Per-core CPU stats |
+| `ha_stats` | High availability node stats |
+| `mps_health` | MPS health stats (MPS targets only) |
 
 ## Endpoints
 
@@ -119,7 +121,14 @@ Use `-disabled-modules` to skip collectors that aren't supported by your device:
 
 ## Metrics
 
-All metrics include any custom labels defined via `-labels`.
+Target metrics include any custom labels defined via `-labels`. Exporter self-metrics use only the labels shown below:
+
+| Metric | Description |
+|--------|-------------|
+| `netscaler_exporter_scrape_success` | Whether every enabled collector succeeded (`1`) or any failed (`0`) |
+| `netscaler_exporter_collector_success{collector="..."}` | Whether an enabled collector succeeded (`1`) or failed (`0`); disabled collectors are absent |
+| `netscaler_exporter_scrape_duration_seconds` | Total duration of the exporter scrape |
+| `netscaler_exporter_build_info{version,revision,target_type}` | Exporter build and target information (always `1`) |
 
 ### ADC Metrics
 

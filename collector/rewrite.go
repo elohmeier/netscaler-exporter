@@ -24,13 +24,13 @@ type httpHostRewriteMapping struct {
 	Host          string
 }
 
-func (e *Exporter) collectHTTPHostRewriteInfo(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) {
+func (e *Exporter) collectHTTPHostRewriteInfo(ctx context.Context, nsClient *netscaler.NitroClient, ch chan<- prometheus.Metric) bool {
 	e.lbVServerHTTPHostRewriteInfo.Reset()
 
 	bindings, err := netscaler.GetAllLBVServerRewritePolicyBindings(ctx, nsClient)
 	if err != nil {
 		e.logger.Error("failed to get LB vserver rewrite policy bindings", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	hasRequestBinding := false
@@ -42,19 +42,19 @@ func (e *Exporter) collectHTTPHostRewriteInfo(ctx context.Context, nsClient *net
 	}
 	if !hasRequestBinding {
 		e.lbVServerHTTPHostRewriteInfo.Collect(ch)
-		return
+		return true
 	}
 
 	policies, err := netscaler.GetAllRewritePolicies(ctx, nsClient)
 	if err != nil {
 		e.logger.Error("failed to get rewrite policies", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	actions, err := netscaler.GetAllRewriteActions(ctx, nsClient)
 	if err != nil {
 		e.logger.Error("failed to get rewrite actions", "url", e.url, "err", err)
-		return
+		return false
 	}
 
 	for _, mapping := range resolveHTTPHostRewrites(bindings, policies, actions) {
@@ -70,6 +70,7 @@ func (e *Exporter) collectHTTPHostRewriteInfo(ctx context.Context, nsClient *net
 	}
 
 	e.lbVServerHTTPHostRewriteInfo.Collect(ch)
+	return true
 }
 
 func resolveHTTPHostRewrites(

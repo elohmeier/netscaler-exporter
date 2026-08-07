@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,15 +16,50 @@ import (
 
 // Collect is initiated by the Prometheus handler and gathers the metrics
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	started := time.Now()
+
+	var results map[string]bool
 	if e.targetType == "mps" {
-		e.scrapeMPS(ch)
+		results = e.scrapeMPS(ch)
 	} else {
-		e.scrapeADC(ch)
+		results = e.scrapeADC(ch)
 	}
+
+	collectorNames := make([]string, 0, len(results))
+	for name := range results {
+		collectorNames = append(collectorNames, name)
+	}
+	sort.Strings(collectorNames)
+
+	scrapeSucceeded := true
+	for _, name := range collectorNames {
+		value := 0.0
+		if results[name] {
+			value = 1
+		} else {
+			scrapeSucceeded = false
+		}
+		ch <- prometheus.MustNewConstMetric(e.collectorSuccess, prometheus.GaugeValue, value, name)
+	}
+
+	scrapeSuccessValue := 0.0
+	if scrapeSucceeded {
+		scrapeSuccessValue = 1
+	}
+	ch <- prometheus.MustNewConstMetric(e.scrapeSuccess, prometheus.GaugeValue, scrapeSuccessValue)
+	ch <- prometheus.MustNewConstMetric(e.scrapeDuration, prometheus.GaugeValue, time.Since(started).Seconds())
+	ch <- prometheus.MustNewConstMetric(
+		e.build,
+		prometheus.GaugeValue,
+		1,
+		e.buildInfo.Version,
+		e.buildInfo.Revision,
+		e.targetType,
+	)
 }
 
 // scrapeADC scrapes the NetScaler ADC instance
-func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
+func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) map[string]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -31,24 +67,30 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 	nsClient := e.nsClient
 
 	var wg sync.WaitGroup
+	var resultsMu sync.Mutex
+	results := make(map[string]bool)
 	// Semaphore to limit concurrent requests to avoid overloading the NetScaler
 	sem := make(chan struct{}, e.parallelism)
 
 	// Helper to run a scrape function concurrently
-	run := func(name string, scrapeFn func()) {
+	run := func(name string, scrapeFn func() bool) {
 		if e.config.IsModuleDisabled(name) {
 			return // Skip disabled modules
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			succeeded := false
 			select {
 			case sem <- struct{}{}: // Acquire token
 				defer func() { <-sem }() // Release token
-				scrapeFn()
+				succeeded = scrapeFn()
 			case <-ctx.Done():
 				e.logger.Warn("context cancelled, skipping scrape", "url", e.url, "name", name)
 			}
+			resultsMu.Lock()
+			results[name] = succeeded
+			resultsMu.Unlock()
 		}()
 	}
 
@@ -58,20 +100,20 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 	// Collect topology metrics FIRST (synchronously) to populate chainMembership
 	// This must complete before service_groups runs so it can use chain labels
 	if !e.config.IsModuleDisabled("topology") {
-		e.collectTopologyMetrics(ctx, nsClient, ch)
+		results["topology"] = e.collectTopologyMetrics(ctx, nsClient, ch)
 	}
 
 	// Static request-side Host rewrite configuration for LB virtual servers.
-	run("rewrite_policies", func() {
-		e.collectHTTPHostRewriteInfo(ctx, nsClient, ch)
+	run("rewrite_policies", func() bool {
+		return e.collectHTTPHostRewriteInfo(ctx, nsClient, ch)
 	})
 
 	// 1. NS Stats
-	run("ns_stats", func() {
+	run("ns_stats", func() bool {
 		ns, err := netscaler.GetNSStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get NS stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 
 		fltTotRxMB, _ := strconv.ParseFloat(ns.NSStats.TotalReceivedMB, 64)
@@ -96,25 +138,27 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(e.tcpCurrentClientConnectionsEstablished, prometheus.GaugeValue, fltTCPCurrentClientConnectionsEstablished, baseLabels...)
 		ch <- prometheus.MustNewConstMetric(e.tcpCurrentServerConnections, prometheus.GaugeValue, fltTCPCurrentServerConnections, baseLabels...)
 		ch <- prometheus.MustNewConstMetric(e.tcpCurrentServerConnectionsEstablished, prometheus.GaugeValue, fltTCPCurrentServerConnectionsEstablished, baseLabels...)
+		return true
 	})
 
 	// 2. NS License
-	run("ns_license", func() {
+	run("ns_license", func() bool {
 		nslicense, err := netscaler.GetNSLicense(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get NS license", "url", e.url, "err", err)
-			return
+			return false
 		}
 		fltModelID, _ := strconv.ParseFloat(nslicense.NSLicense.ModelID, 64)
 		ch <- prometheus.MustNewConstMetric(e.modelID, prometheus.GaugeValue, fltModelID, baseLabels...)
+		return true
 	})
 
 	// 3. Interfaces
-	run("interfaces", func() {
+	run("interfaces", func() bool {
 		interfaces, err := netscaler.GetInterfaceStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get interface stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectInterfacesRxBytes(interfaces)
 		e.interfacesRxBytes.Collect(ch)
@@ -130,14 +174,15 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.interfacesJumboPacketsTx.Collect(ch)
 		e.collectInterfacesErrorPacketsRx(interfaces)
 		e.interfacesErrorPacketsRx.Collect(ch)
+		return true
 	})
 
 	// 4. Virtual Servers
-	run("virtual_servers", func() {
+	run("virtual_servers", func() bool {
 		virtualServers, err := netscaler.GetVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get virtual server stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectVirtualServerState(virtualServers)
 		e.virtualServersState.Collect(ch)
@@ -163,14 +208,15 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.virtualServersCurrentClientConnections.Collect(ch)
 		e.collectVirtualServerCurrentServerConnections(virtualServers)
 		e.virtualServersCurrentServerConnections.Collect(ch)
+		return true
 	})
 
 	// 5. Services
-	run("services", func() {
+	run("services", func() bool {
 		services, err := netscaler.GetServiceStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get service stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectServicesThroughput(services)
 		e.servicesThroughput.Collect(ch)
@@ -204,14 +250,15 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.servicesVirtualServerServiceHits.Collect(ch)
 		e.collectServicesActiveTransactions(services)
 		e.servicesActiveTransactions.Collect(ch)
+		return true
 	})
 
 	// 6. GSLB Services
-	run("gslb_services", func() {
+	run("gslb_services", func() bool {
 		gslbServices, err := netscaler.GetGSLBServiceStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get GSLB service stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectGSLBServicesState(gslbServices)
 		e.gslbServicesState.Collect(ch)
@@ -233,14 +280,15 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.gslbServicesCurrentLoad.Collect(ch)
 		e.collectGSLBServicesVirtualServerServiceHits(gslbServices)
 		e.gslbServicesVirtualServerServiceHits.Collect(ch)
+		return true
 	})
 
 	// 7. GSLB Virtual Servers
-	run("gslb_vservers", func() {
+	run("gslb_vservers", func() bool {
 		gslbVirtualServers, err := netscaler.GetGSLBVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get GSLB virtual server stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectGSLBVirtualServerState(gslbVirtualServers)
 		e.gslbVirtualServersState.Collect(ch)
@@ -264,14 +312,15 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.gslbVirtualServersCurrentClientConnections.Collect(ch)
 		e.collectGSLBVirtualServerCurrentServerConnections(gslbVirtualServers)
 		e.gslbVirtualServersCurrentServerConnections.Collect(ch)
+		return true
 	})
 
 	// 8. CS Virtual Servers
-	run("cs_vservers", func() {
+	run("cs_vservers", func() bool {
 		csVirtualServers, err := netscaler.GetCSVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get CS virtual server stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectCSVirtualServerState(csVirtualServers)
 		e.csVirtualServersState.Collect(ch)
@@ -309,14 +358,15 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.csVirtualServersCurrentMultipathSessions.Collect(ch)
 		e.collectCSVirtualServerCurrentMultipathSubflows(csVirtualServers)
 		e.csVirtualServersCurrentMultipathSubflows.Collect(ch)
+		return true
 	})
 
 	// 9. VPN Virtual Servers
-	run("vpn_vservers", func() {
+	run("vpn_vservers", func() bool {
 		vpnVirtualServers, err := netscaler.GetVPNVirtualServerStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get VPN virtual server stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectVPNVirtualServerTotalRequests(vpnVirtualServers)
 		e.vpnVirtualServersTotalRequests.Collect(ch)
@@ -328,14 +378,15 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.vpnVirtualServersTotalResponseBytes.Collect(ch)
 		e.collectVPNVirtualServerState(vpnVirtualServers)
 		e.vpnVirtualServersState.Collect(ch)
+		return true
 	})
 
 	// 10. AAA Stats
-	run("aaa_stats", func() {
+	run("aaa_stats", func() bool {
 		aaa, err := netscaler.GetAAAStats(ctx, nsClient, "")
 		if err != nil {
 			e.logger.Error("failed to get AAA stats", "url", e.url, "err", err)
-			return
+			return false
 		}
 		e.collectAaaAuthSuccess(aaa)
 		e.aaaAuthSuccess.Collect(ch)
@@ -349,14 +400,22 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.aaaCurIcaSessions.Collect(ch)
 		e.collectAaaCurIcaOnlyConn(aaa)
 		e.aaaCurIcaOnlyConn.Collect(ch)
+		return true
 	})
 
 	// 11. Service Groups (Nested parallelization)
-	run("service_groups", func() {
+	run("service_groups", func() bool {
 		servicegroups, err := netscaler.GetServiceGroups(ctx, nsClient, "attrs=servicegroupname")
 		if err != nil {
 			e.logger.Error("failed to get service groups", "url", e.url, "err", err)
-			return
+			return false
+		}
+		collectorSucceeded := true
+		var collectorSucceededMu sync.Mutex
+		markCollectorFailed := func() {
+			collectorSucceededMu.Lock()
+			collectorSucceeded = false
+			collectorSucceededMu.Unlock()
 		}
 
 		// Reset all servicegroup metrics once before processing
@@ -395,6 +454,7 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 				case sem <- struct{}{}:
 					defer func() { <-sem }()
 				case <-ctx.Done():
+					markCollectorFailed()
 					return
 				}
 
@@ -408,6 +468,7 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 				stats, err2 := netscaler.GetServiceGroupMemberStats(ctx, nsClient, sgName)
 				if err2 != nil {
 					e.logger.Error("failed to get service group member stats", "service_group", sgName, "url", e.url, "err", err2)
+					markCollectorFailed()
 					return
 				}
 
@@ -591,51 +652,55 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.serviceGroupsServerEstablishedConnections.Collect(ch)
 		e.serviceGroupsCurrentReusePool.Collect(ch)
 		e.serviceGroupsMaxClients.Collect(ch)
+
+		collectorSucceededMu.Lock()
+		defer collectorSucceededMu.Unlock()
+		return collectorSucceeded
 	})
 
 	// 12. Protocol HTTP Stats
-	run("protocol_http", func() {
-		e.collectProtocolHTTPStats(ctx, nsClient, ch)
+	run("protocol_http", func() bool {
+		return e.collectProtocolHTTPStats(ctx, nsClient, ch)
 	})
 
 	// 14. Protocol TCP Stats
-	run("protocol_tcp", func() {
-		e.collectProtocolTCPStats(ctx, nsClient, ch)
+	run("protocol_tcp", func() bool {
+		return e.collectProtocolTCPStats(ctx, nsClient, ch)
 	})
 
 	// 15. Protocol IP Stats
-	run("protocol_ip", func() {
-		e.collectProtocolIPStats(ctx, nsClient, ch)
+	run("protocol_ip", func() bool {
+		return e.collectProtocolIPStats(ctx, nsClient, ch)
 	})
 
 	// 16. SSL Stats
-	run("ssl_stats", func() {
-		e.collectSSLStats(ctx, nsClient, ch)
+	run("ssl_stats", func() bool {
+		return e.collectSSLStats(ctx, nsClient, ch)
 	})
 
 	// 17. SSL Cert Keys
-	run("ssl_certs", func() {
-		e.collectSSLCertKeys(ctx, nsClient, ch)
+	run("ssl_certs", func() bool {
+		return e.collectSSLCertKeys(ctx, nsClient, ch)
 	})
 
 	// 18. SSL VServer Stats
-	run("ssl_vservers", func() {
-		e.collectSSLVServerStats(ctx, nsClient, ch)
+	run("ssl_vservers", func() bool {
+		return e.collectSSLVServerStats(ctx, nsClient, ch)
 	})
 
 	// 19. System CPU per-core Stats
-	run("system_cpu", func() {
-		e.collectSystemCPUStats(ctx, nsClient, ch)
+	run("system_cpu", func() bool {
+		return e.collectSystemCPUStats(ctx, nsClient, ch)
 	})
 
 	// 20. Bandwidth Capacity Stats
-	run("ns_capacity", func() {
-		e.collectNSCapacityStats(ctx, nsClient, ch)
+	run("ns_capacity", func() bool {
+		return e.collectNSCapacityStats(ctx, nsClient, ch)
 	})
 
 	// 21. HA (High Availability) Stats
-	run("ha_stats", func() {
-		e.collectHAStats(ctx, nsClient, ch)
+	run("ha_stats", func() bool {
+		return e.collectHAStats(ctx, nsClient, ch)
 	})
 
 	wg.Wait()
@@ -650,12 +715,19 @@ func (e *Exporter) scrapeADC(ch chan<- prometheus.Metric) {
 		e.topologyNodeConnections.Collect(ch)
 		e.topologyNodeTTFBMs.Collect(ch)
 	}
+
+	return results
 }
 
 // scrapeMPS scrapes the Citrix ADM (MPS) instance
-func (e *Exporter) scrapeMPS(ch chan<- prometheus.Metric) {
+func (e *Exporter) scrapeMPS(ch chan<- prometheus.Metric) map[string]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	results := make(map[string]bool)
+
+	if e.config.IsModuleDisabled("mps_health") {
+		return results
+	}
 
 	// Use persistent client with session-based authentication
 	mpsClient := e.mpsClient
@@ -664,7 +736,8 @@ func (e *Exporter) scrapeMPS(ch chan<- prometheus.Metric) {
 	mpsHealth, err := netscaler.GetMPSHealth(ctx, mpsClient)
 	if err != nil {
 		e.logger.Error("failed to get MPS health stats", "url", e.url, "err", err)
-		return
+		results["mps_health"] = false
+		return results
 	}
 
 	e.collectMPSHealth(mpsHealth)
@@ -676,4 +749,6 @@ func (e *Exporter) scrapeMPS(ch chan<- prometheus.Metric) {
 	e.mpsHealthMemoryUsage.Collect(ch)
 	e.mpsHealthMemoryFree.Collect(ch)
 	e.mpsHealthMemoryTotal.Collect(ch)
+	results["mps_health"] = true
+	return results
 }

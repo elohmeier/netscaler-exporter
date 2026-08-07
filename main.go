@@ -117,7 +117,18 @@ func main() {
 	logger.Info("starting exporter", "url", url, "type", targetType, "labels", len(labels), "disabled_modules", len(disabled))
 
 	// Create exporter
-	exporter, err := collector.NewExporter(cfg, url, targetType, username, password, ignoreCert, caFile, parallelism, logger)
+	exporter, err := collector.NewExporter(
+		cfg,
+		url,
+		targetType,
+		username,
+		password,
+		ignoreCert,
+		caFile,
+		parallelism,
+		logger,
+		collector.BuildInfo{Version: version, Revision: build},
+	)
 	if err != nil {
 		logger.Error("failed to create exporter", "err", err)
 		os.Exit(1)
