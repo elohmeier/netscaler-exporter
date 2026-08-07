@@ -164,6 +164,10 @@ Dynamic rewrite expressions and rewrites of headers other than `Host` are intent
 
 - **Health**: CPU usage, memory usage/free/total, disk usage/free/total/used
 
+MPS requests use stateless `X-NITRO-USER`/`X-NITRO-PASS` authentication. This
+avoids consuming the limited per-user ADM login sessions and remains usable when
+the interactive session limit has already been reached.
+
 ## License
 
 MIT
