@@ -64,13 +64,13 @@ type Exporter struct {
 	tcpCurrentServerConnectionsEstablished *prometheus.Desc
 
 	// Interface metrics
-	interfacesRxBytes        *prometheus.GaugeVec
-	interfacesTxBytes        *prometheus.GaugeVec
-	interfacesRxPackets      *prometheus.GaugeVec
-	interfacesTxPackets      *prometheus.GaugeVec
-	interfacesJumboPacketsRx *prometheus.GaugeVec
-	interfacesJumboPacketsTx *prometheus.GaugeVec
-	interfacesErrorPacketsRx *prometheus.GaugeVec
+	interfacesRxBytes        *absoluteCounterVec
+	interfacesTxBytes        *absoluteCounterVec
+	interfacesRxPackets      *absoluteCounterVec
+	interfacesTxPackets      *absoluteCounterVec
+	interfacesJumboPacketsRx *absoluteCounterVec
+	interfacesJumboPacketsTx *absoluteCounterVec
+	interfacesErrorPacketsRx *absoluteCounterVec
 
 	// Virtual Server metrics
 	virtualServersState                    *prometheus.GaugeVec
@@ -78,11 +78,11 @@ type Exporter struct {
 	virtualServersHealth                   *prometheus.GaugeVec
 	virtualServersInactiveServices         *prometheus.GaugeVec
 	virtualServersActiveServices           *prometheus.GaugeVec
-	virtualServersTotalHits                *prometheus.GaugeVec
-	virtualServersTotalRequests            *prometheus.GaugeVec
-	virtualServersTotalResponses           *prometheus.GaugeVec
-	virtualServersTotalRequestBytes        *prometheus.GaugeVec
-	virtualServersTotalResponseBytes       *prometheus.GaugeVec
+	virtualServersTotalHits                *absoluteCounterVec
+	virtualServersTotalRequests            *absoluteCounterVec
+	virtualServersTotalResponses           *absoluteCounterVec
+	virtualServersTotalRequestBytes        *absoluteCounterVec
+	virtualServersTotalResponseBytes       *absoluteCounterVec
 	virtualServersCurrentClientConnections *prometheus.GaugeVec
 	virtualServersCurrentServerConnections *prometheus.GaugeVec
 
@@ -90,10 +90,10 @@ type Exporter struct {
 	servicesThroughput                   *prometheus.GaugeVec
 	servicesAvgTTFB                      *prometheus.GaugeVec
 	servicesState                        *prometheus.GaugeVec
-	servicesTotalRequests                *prometheus.GaugeVec
-	servicesTotalResponses               *prometheus.GaugeVec
-	servicesTotalRequestBytes            *prometheus.GaugeVec
-	servicesTotalResponseBytes           *prometheus.GaugeVec
+	servicesTotalRequests                *absoluteCounterVec
+	servicesTotalResponses               *absoluteCounterVec
+	servicesTotalRequestBytes            *absoluteCounterVec
+	servicesTotalResponseBytes           *absoluteCounterVec
 	servicesCurrentClientConns           *prometheus.GaugeVec
 	servicesSurgeCount                   *prometheus.GaugeVec
 	servicesCurrentServerConns           *prometheus.GaugeVec
@@ -101,16 +101,16 @@ type Exporter struct {
 	servicesCurrentReusePool             *prometheus.GaugeVec
 	servicesMaxClients                   *prometheus.GaugeVec
 	servicesCurrentLoad                  *prometheus.GaugeVec
-	servicesVirtualServerServiceHits     *prometheus.GaugeVec
+	servicesVirtualServerServiceHits     *absoluteCounterVec
 	servicesActiveTransactions           *prometheus.GaugeVec
 
 	// Service Group metrics
 	serviceGroupsState                        *prometheus.GaugeVec
 	serviceGroupsAvgTTFB                      *prometheus.GaugeVec
-	serviceGroupsTotalRequests                *prometheus.GaugeVec
-	serviceGroupsTotalResponses               *prometheus.GaugeVec
-	serviceGroupsTotalRequestBytes            *prometheus.GaugeVec
-	serviceGroupsTotalResponseBytes           *prometheus.GaugeVec
+	serviceGroupsTotalRequests                *absoluteCounterVec
+	serviceGroupsTotalResponses               *absoluteCounterVec
+	serviceGroupsTotalRequestBytes            *absoluteCounterVec
+	serviceGroupsTotalResponseBytes           *absoluteCounterVec
 	serviceGroupsCurrentClientConnections     *prometheus.GaugeVec
 	serviceGroupsSurgeCount                   *prometheus.GaugeVec
 	serviceGroupsCurrentServerConnections     *prometheus.GaugeVec
@@ -120,14 +120,14 @@ type Exporter struct {
 
 	// GSLB Service metrics
 	gslbServicesState                    *prometheus.GaugeVec
-	gslbServicesTotalRequests            *prometheus.GaugeVec
-	gslbServicesTotalResponses           *prometheus.GaugeVec
-	gslbServicesTotalRequestBytes        *prometheus.GaugeVec
-	gslbServicesTotalResponseBytes       *prometheus.GaugeVec
+	gslbServicesTotalRequests            *absoluteCounterVec
+	gslbServicesTotalResponses           *absoluteCounterVec
+	gslbServicesTotalRequestBytes        *absoluteCounterVec
+	gslbServicesTotalResponseBytes       *absoluteCounterVec
 	gslbServicesCurrentClientConns       *prometheus.GaugeVec
 	gslbServicesCurrentServerConns       *prometheus.GaugeVec
 	gslbServicesCurrentLoad              *prometheus.GaugeVec
-	gslbServicesVirtualServerServiceHits *prometheus.GaugeVec
+	gslbServicesVirtualServerServiceHits *absoluteCounterVec
 	gslbServicesEstablishedConnections   *prometheus.GaugeVec
 
 	// GSLB Virtual Server metrics
@@ -135,46 +135,46 @@ type Exporter struct {
 	gslbVirtualServersHealth                   *prometheus.GaugeVec
 	gslbVirtualServersInactiveServices         *prometheus.GaugeVec
 	gslbVirtualServersActiveServices           *prometheus.GaugeVec
-	gslbVirtualServersTotalHits                *prometheus.GaugeVec
-	gslbVirtualServersTotalRequests            *prometheus.GaugeVec
-	gslbVirtualServersTotalResponses           *prometheus.GaugeVec
-	gslbVirtualServersTotalRequestBytes        *prometheus.GaugeVec
-	gslbVirtualServersTotalResponseBytes       *prometheus.GaugeVec
+	gslbVirtualServersTotalHits                *absoluteCounterVec
+	gslbVirtualServersTotalRequests            *absoluteCounterVec
+	gslbVirtualServersTotalResponses           *absoluteCounterVec
+	gslbVirtualServersTotalRequestBytes        *absoluteCounterVec
+	gslbVirtualServersTotalResponseBytes       *absoluteCounterVec
 	gslbVirtualServersCurrentClientConnections *prometheus.GaugeVec
 	gslbVirtualServersCurrentServerConnections *prometheus.GaugeVec
 
 	// CS Virtual Server metrics
 	csVirtualServersState                               *prometheus.GaugeVec
-	csVirtualServersTotalHits                           *prometheus.GaugeVec
-	csVirtualServersTotalRequests                       *prometheus.GaugeVec
-	csVirtualServersTotalResponses                      *prometheus.GaugeVec
-	csVirtualServersTotalRequestBytes                   *prometheus.GaugeVec
-	csVirtualServersTotalResponseBytes                  *prometheus.GaugeVec
+	csVirtualServersTotalHits                           *absoluteCounterVec
+	csVirtualServersTotalRequests                       *absoluteCounterVec
+	csVirtualServersTotalResponses                      *absoluteCounterVec
+	csVirtualServersTotalRequestBytes                   *absoluteCounterVec
+	csVirtualServersTotalResponseBytes                  *absoluteCounterVec
 	csVirtualServersCurrentClientConnections            *prometheus.GaugeVec
 	csVirtualServersCurrentServerConnections            *prometheus.GaugeVec
 	csVirtualServersEstablishedConnections              *prometheus.GaugeVec
-	csVirtualServersTotalPacketsReceived                *prometheus.GaugeVec
-	csVirtualServersTotalPacketsSent                    *prometheus.GaugeVec
-	csVirtualServersTotalSpillovers                     *prometheus.GaugeVec
-	csVirtualServersDeferredRequests                    *prometheus.GaugeVec
-	csVirtualServersNumberInvalidRequestResponse        *prometheus.GaugeVec
-	csVirtualServersNumberInvalidRequestResponseDropped *prometheus.GaugeVec
-	csVirtualServersTotalVServerDownBackupHits          *prometheus.GaugeVec
+	csVirtualServersTotalPacketsReceived                *absoluteCounterVec
+	csVirtualServersTotalPacketsSent                    *absoluteCounterVec
+	csVirtualServersTotalSpillovers                     *absoluteCounterVec
+	csVirtualServersDeferredRequests                    *absoluteCounterVec
+	csVirtualServersNumberInvalidRequestResponse        *absoluteCounterVec
+	csVirtualServersNumberInvalidRequestResponseDropped *absoluteCounterVec
+	csVirtualServersTotalVServerDownBackupHits          *absoluteCounterVec
 	csVirtualServersCurrentMultipathSessions            *prometheus.GaugeVec
 	csVirtualServersCurrentMultipathSubflows            *prometheus.GaugeVec
 
 	// VPN Virtual Server metrics
-	vpnVirtualServersTotalRequests      *prometheus.GaugeVec
-	vpnVirtualServersTotalResponses     *prometheus.GaugeVec
-	vpnVirtualServersTotalRequestBytes  *prometheus.GaugeVec
-	vpnVirtualServersTotalResponseBytes *prometheus.GaugeVec
+	vpnVirtualServersTotalRequests      *absoluteCounterVec
+	vpnVirtualServersTotalResponses     *absoluteCounterVec
+	vpnVirtualServersTotalRequestBytes  *absoluteCounterVec
+	vpnVirtualServersTotalResponseBytes *absoluteCounterVec
 	vpnVirtualServersState              *prometheus.GaugeVec
 
 	// AAA metrics
-	aaaAuthSuccess         *prometheus.GaugeVec
-	aaaAuthFail            *prometheus.GaugeVec
-	aaaAuthOnlyHTTPSuccess *prometheus.GaugeVec
-	aaaAuthOnlyHTTPFail    *prometheus.GaugeVec
+	aaaAuthSuccess         *absoluteCounterVec
+	aaaAuthFail            *absoluteCounterVec
+	aaaAuthOnlyHTTPSuccess *absoluteCounterVec
+	aaaAuthOnlyHTTPFail    *absoluteCounterVec
 	aaaCurIcaSessions      *prometheus.GaugeVec
 	aaaCurIcaOnlyConn      *prometheus.GaugeVec
 
@@ -185,7 +185,7 @@ type Exporter struct {
 	// Topology node stats (for node graph visualization)
 	topologyNodeState         *prometheus.GaugeVec
 	topologyNodeHealth        *prometheus.GaugeVec
-	topologyNodeRequestsTotal *prometheus.GaugeVec
+	topologyNodeRequestsTotal *absoluteCounterVec
 	topologyNodeConnections   *prometheus.GaugeVec
 	topologyNodeTTFBMs        *prometheus.GaugeVec
 
@@ -324,14 +324,14 @@ type Exporter struct {
 	sslCertDaysToExpire *prometheus.GaugeVec
 
 	// SSL VServer metrics
-	sslVServerTotalDecBytes          *prometheus.GaugeVec
-	sslVServerTotalEncBytes          *prometheus.GaugeVec
-	sslVServerTotalHWDecBytes        *prometheus.GaugeVec
-	sslVServerTotalHWEncBytes        *prometheus.GaugeVec
-	sslVServerTotalSessionNew        *prometheus.GaugeVec
-	sslVServerTotalSessionHits       *prometheus.GaugeVec
-	sslVServerTotalClientAuthSuccess *prometheus.GaugeVec
-	sslVServerTotalClientAuthFailure *prometheus.GaugeVec
+	sslVServerTotalDecBytes          *absoluteCounterVec
+	sslVServerTotalEncBytes          *absoluteCounterVec
+	sslVServerTotalHWDecBytes        *absoluteCounterVec
+	sslVServerTotalHWEncBytes        *absoluteCounterVec
+	sslVServerTotalSessionNew        *absoluteCounterVec
+	sslVServerTotalSessionHits       *absoluteCounterVec
+	sslVServerTotalClientAuthSuccess *absoluteCounterVec
+	sslVServerTotalClientAuthFailure *absoluteCounterVec
 	sslVServerHealth                 *prometheus.GaugeVec
 	sslVServerActiveServices         *prometheus.GaugeVec
 	sslVServerClientAuthSuccessRate  *prometheus.GaugeVec
@@ -452,23 +452,23 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		pktCPUUsage:                            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "pkt_cpu_usage"), "Current CPU utilisation for packet engines", baseLabels, nil),
 		flashPartitionUsage:                    prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "flash_partition_usage"), "Used space in /flash partition", baseLabels, nil),
 		varPartitionUsage:                      prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "var_partition_usage"), "Used space in /var partition", baseLabels, nil),
-		totRxMB:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "total_received_mb"), "Total Megabytes received", baseLabels, nil),
-		totTxMB:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "total_transmit_mb"), "Total Megabytes transmitted", baseLabels, nil),
-		httpRequests:                           prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_requests"), "Total HTTP requests received", baseLabels, nil),
-		httpResponses:                          prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_responses"), "Total HTTP responses sent", baseLabels, nil),
+		totRxMB:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "received_mb_total"), "Total Megabytes received", baseLabels, nil),
+		totTxMB:                                prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "transmit_mb_total"), "Total Megabytes transmitted", baseLabels, nil),
+		httpRequests:                           prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_requests_received_total"), "Total HTTP requests received", baseLabels, nil),
+		httpResponses:                          prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "http_responses_sent_total"), "Total HTTP responses sent", baseLabels, nil),
 		tcpCurrentClientConnections:            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_current_client_connections"), "Current client connections", baseLabels, nil),
 		tcpCurrentClientConnectionsEstablished: prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_current_client_connections_established"), "Current established client connections", baseLabels, nil),
 		tcpCurrentServerConnections:            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_current_server_connections"), "Current server connections", baseLabels, nil),
 		tcpCurrentServerConnectionsEstablished: prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_current_server_connections_established"), "Current established server connections", baseLabels, nil),
 
 		// Interface metrics
-		interfacesRxBytes:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "interfaces_received_bytes", Help: "Bytes received by interface"}, ifLabels),
-		interfacesTxBytes:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "interfaces_transmitted_bytes", Help: "Bytes transmitted by interface"}, ifLabels),
-		interfacesRxPackets:      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "interfaces_received_packets", Help: "Packets received by interface"}, ifLabels),
-		interfacesTxPackets:      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "interfaces_transmitted_packets", Help: "Packets transmitted by interface"}, ifLabels),
-		interfacesJumboPacketsRx: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "interfaces_jumbo_packets_received", Help: "Jumbo packets received by interface"}, ifLabels),
-		interfacesJumboPacketsTx: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "interfaces_jumbo_packets_transmitted", Help: "Jumbo packets transmitted by interface"}, ifLabels),
-		interfacesErrorPacketsRx: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "interfaces_error_packets_received", Help: "Error packets received by interface"}, ifLabels),
+		interfacesRxBytes:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "interfaces_received_bytes_total", Help: "Bytes received by interface"}, ifLabels),
+		interfacesTxBytes:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "interfaces_transmitted_bytes_total", Help: "Bytes transmitted by interface"}, ifLabels),
+		interfacesRxPackets:      newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "interfaces_received_packets_total", Help: "Packets received by interface"}, ifLabels),
+		interfacesTxPackets:      newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "interfaces_transmitted_packets_total", Help: "Packets transmitted by interface"}, ifLabels),
+		interfacesJumboPacketsRx: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "interfaces_jumbo_packets_received_total", Help: "Jumbo packets received by interface"}, ifLabels),
+		interfacesJumboPacketsTx: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "interfaces_jumbo_packets_transmitted_total", Help: "Jumbo packets transmitted by interface"}, ifLabels),
+		interfacesErrorPacketsRx: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "interfaces_error_packets_received_total", Help: "Error packets received by interface"}, ifLabels),
 
 		// Virtual Server metrics
 		virtualServersState:                    prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_state", Help: "Current state of the server"}, vsLabels),
@@ -476,11 +476,11 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		virtualServersHealth:                   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_health", Help: "Percentage of UP services"}, vsLabels),
 		virtualServersInactiveServices:         prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_inactive_services", Help: "Number of inactive services"}, vsLabels),
 		virtualServersActiveServices:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_active_services", Help: "Number of active services"}, vsLabels),
-		virtualServersTotalHits:                prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_total_hits", Help: "Total hits"}, vsLabels),
-		virtualServersTotalRequests:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_total_requests", Help: "Total requests"}, vsLabels),
-		virtualServersTotalResponses:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_total_responses", Help: "Total responses"}, vsLabels),
-		virtualServersTotalRequestBytes:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_total_request_bytes", Help: "Total request bytes"}, vsLabels),
-		virtualServersTotalResponseBytes:       prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_total_response_bytes", Help: "Total response bytes"}, vsLabels),
+		virtualServersTotalHits:                newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "virtual_servers_hits_total", Help: "Total hits"}, vsLabels),
+		virtualServersTotalRequests:            newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "virtual_servers_requests_total", Help: "Total requests"}, vsLabels),
+		virtualServersTotalResponses:           newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "virtual_servers_responses_total", Help: "Total responses"}, vsLabels),
+		virtualServersTotalRequestBytes:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "virtual_servers_request_bytes_total", Help: "Total request bytes"}, vsLabels),
+		virtualServersTotalResponseBytes:       newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "virtual_servers_response_bytes_total", Help: "Total response bytes"}, vsLabels),
 		virtualServersCurrentClientConnections: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_current_client_connections", Help: "Current client connections"}, vsLabels),
 		virtualServersCurrentServerConnections: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "virtual_servers_current_server_connections", Help: "Current server connections"}, vsLabels),
 
@@ -488,10 +488,10 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		servicesThroughput:                   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_throughput", Help: "Throughput in Mbps"}, svcLabels),
 		servicesAvgTTFB:                      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_average_time_to_first_byte", Help: "Average TTFB"}, svcLabels),
 		servicesState:                        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_state", Help: "Current state"}, svcLabels),
-		servicesTotalRequests:                prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_total_requests", Help: "Total requests"}, svcLabels),
-		servicesTotalResponses:               prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_total_responses", Help: "Total responses"}, svcLabels),
-		servicesTotalRequestBytes:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_total_request_bytes", Help: "Total request bytes"}, svcLabels),
-		servicesTotalResponseBytes:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_total_response_bytes", Help: "Total response bytes"}, svcLabels),
+		servicesTotalRequests:                newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "service_requests_total", Help: "Total requests"}, svcLabels),
+		servicesTotalResponses:               newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "service_responses_total", Help: "Total responses"}, svcLabels),
+		servicesTotalRequestBytes:            newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "service_request_bytes_total", Help: "Total request bytes"}, svcLabels),
+		servicesTotalResponseBytes:           newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "service_response_bytes_total", Help: "Total response bytes"}, svcLabels),
 		servicesCurrentClientConns:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_current_client_connections", Help: "Current client connections"}, svcLabels),
 		servicesSurgeCount:                   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_surge_count", Help: "Requests in surge queue"}, svcLabels),
 		servicesCurrentServerConns:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_current_server_connections", Help: "Current server connections"}, svcLabels),
@@ -499,16 +499,16 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		servicesCurrentReusePool:             prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_current_reuse_pool", Help: "Requests in reuse pool"}, svcLabels),
 		servicesMaxClients:                   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_max_clients", Help: "Max open connections"}, svcLabels),
 		servicesCurrentLoad:                  prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_current_load", Help: "Current load"}, svcLabels),
-		servicesVirtualServerServiceHits:     prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_virtual_server_service_hits", Help: "Service hits"}, svcLabels),
+		servicesVirtualServerServiceHits:     newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "service_virtual_server_service_hits_total", Help: "Service hits"}, svcLabels),
 		servicesActiveTransactions:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "service_active_transactions", Help: "Active transactions"}, svcLabels),
 
 		// Service Group metrics
 		serviceGroupsState:                        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_state", Help: "Current state"}, sgLabels),
 		serviceGroupsAvgTTFB:                      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_average_time_to_first_byte", Help: "Average TTFB"}, sgLabels),
-		serviceGroupsTotalRequests:                prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_total_requests", Help: "Total requests"}, sgLabels),
-		serviceGroupsTotalResponses:               prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_total_responses", Help: "Total responses"}, sgLabels),
-		serviceGroupsTotalRequestBytes:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_total_request_bytes", Help: "Total request bytes"}, sgLabels),
-		serviceGroupsTotalResponseBytes:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_total_response_bytes", Help: "Total response bytes"}, sgLabels),
+		serviceGroupsTotalRequests:                newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "servicegroup_requests_total", Help: "Total requests"}, sgLabels),
+		serviceGroupsTotalResponses:               newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "servicegroup_responses_total", Help: "Total responses"}, sgLabels),
+		serviceGroupsTotalRequestBytes:            newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "servicegroup_request_bytes_total", Help: "Total request bytes"}, sgLabels),
+		serviceGroupsTotalResponseBytes:           newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "servicegroup_response_bytes_total", Help: "Total response bytes"}, sgLabels),
 		serviceGroupsCurrentClientConnections:     prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_current_client_connections", Help: "Current client connections"}, sgLabels),
 		serviceGroupsSurgeCount:                   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_surge_count", Help: "Requests in surge queue"}, sgLabels),
 		serviceGroupsCurrentServerConnections:     prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "servicegroup_current_server_connections", Help: "Current server connections"}, sgLabels),
@@ -518,14 +518,14 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 
 		// GSLB Service metrics
 		gslbServicesState:                    prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_state", Help: "Current state"}, svcLabels),
-		gslbServicesTotalRequests:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_total_requests", Help: "Total requests"}, svcLabels),
-		gslbServicesTotalResponses:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_total_responses", Help: "Total responses"}, svcLabels),
-		gslbServicesTotalRequestBytes:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_total_request_bytes", Help: "Total request bytes"}, svcLabels),
-		gslbServicesTotalResponseBytes:       prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_total_response_bytes", Help: "Total response bytes"}, svcLabels),
+		gslbServicesTotalRequests:            newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_service_requests_total", Help: "Total requests"}, svcLabels),
+		gslbServicesTotalResponses:           newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_service_responses_total", Help: "Total responses"}, svcLabels),
+		gslbServicesTotalRequestBytes:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_service_request_bytes_total", Help: "Total request bytes"}, svcLabels),
+		gslbServicesTotalResponseBytes:       newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_service_response_bytes_total", Help: "Total response bytes"}, svcLabels),
 		gslbServicesCurrentClientConns:       prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_current_client_connections", Help: "Current client connections"}, svcLabels),
 		gslbServicesCurrentServerConns:       prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_current_server_connections", Help: "Current server connections"}, svcLabels),
 		gslbServicesCurrentLoad:              prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_current_load", Help: "Current load"}, svcLabels),
-		gslbServicesVirtualServerServiceHits: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_virtual_server_service_hits", Help: "Service hits"}, svcLabels),
+		gslbServicesVirtualServerServiceHits: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_service_virtual_server_service_hits_total", Help: "Service hits"}, svcLabels),
 		gslbServicesEstablishedConnections:   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_service_established_connections", Help: "Established connections"}, svcLabels),
 
 		// GSLB Virtual Server metrics
@@ -533,46 +533,46 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		gslbVirtualServersHealth:                   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_health", Help: "Percentage of UP services"}, vsLabels),
 		gslbVirtualServersInactiveServices:         prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_inactive_services", Help: "Inactive services"}, vsLabels),
 		gslbVirtualServersActiveServices:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_active_services", Help: "Active services"}, vsLabels),
-		gslbVirtualServersTotalHits:                prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_total_hits", Help: "Total hits"}, vsLabels),
-		gslbVirtualServersTotalRequests:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_total_requests", Help: "Total requests"}, vsLabels),
-		gslbVirtualServersTotalResponses:           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_total_responses", Help: "Total responses"}, vsLabels),
-		gslbVirtualServersTotalRequestBytes:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_total_request_bytes", Help: "Total request bytes"}, vsLabels),
-		gslbVirtualServersTotalResponseBytes:       prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_total_response_bytes", Help: "Total response bytes"}, vsLabels),
+		gslbVirtualServersTotalHits:                newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_hits_total", Help: "Total hits"}, vsLabels),
+		gslbVirtualServersTotalRequests:            newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_requests_total", Help: "Total requests"}, vsLabels),
+		gslbVirtualServersTotalResponses:           newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_responses_total", Help: "Total responses"}, vsLabels),
+		gslbVirtualServersTotalRequestBytes:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_request_bytes_total", Help: "Total request bytes"}, vsLabels),
+		gslbVirtualServersTotalResponseBytes:       newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_response_bytes_total", Help: "Total response bytes"}, vsLabels),
 		gslbVirtualServersCurrentClientConnections: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_current_client_connections", Help: "Current client connections"}, vsLabels),
 		gslbVirtualServersCurrentServerConnections: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "gslb_virtual_servers_current_server_connections", Help: "Current server connections"}, vsLabels),
 
 		// CS Virtual Server metrics
 		csVirtualServersState:                               prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_state", Help: "Current state"}, vsLabels),
-		csVirtualServersTotalHits:                           prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_hits", Help: "Total hits"}, vsLabels),
-		csVirtualServersTotalRequests:                       prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_requests", Help: "Total requests"}, vsLabels),
-		csVirtualServersTotalResponses:                      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_responses", Help: "Total responses"}, vsLabels),
-		csVirtualServersTotalRequestBytes:                   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_request_bytes", Help: "Total request bytes"}, vsLabels),
-		csVirtualServersTotalResponseBytes:                  prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_response_bytes", Help: "Total response bytes"}, vsLabels),
+		csVirtualServersTotalHits:                           newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_hits_total", Help: "Total hits"}, vsLabels),
+		csVirtualServersTotalRequests:                       newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_requests_total", Help: "Total requests"}, vsLabels),
+		csVirtualServersTotalResponses:                      newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_responses_total", Help: "Total responses"}, vsLabels),
+		csVirtualServersTotalRequestBytes:                   newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_request_bytes_total", Help: "Total request bytes"}, vsLabels),
+		csVirtualServersTotalResponseBytes:                  newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_response_bytes_total", Help: "Total response bytes"}, vsLabels),
 		csVirtualServersCurrentClientConnections:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_current_client_connections", Help: "Current client connections"}, vsLabels),
 		csVirtualServersCurrentServerConnections:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_current_server_connections", Help: "Current server connections"}, vsLabels),
 		csVirtualServersEstablishedConnections:              prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_established_connections", Help: "Established connections"}, vsLabels),
-		csVirtualServersTotalPacketsReceived:                prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_packets_received", Help: "Total packets received"}, vsLabels),
-		csVirtualServersTotalPacketsSent:                    prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_packets_sent", Help: "Total packets sent"}, vsLabels),
-		csVirtualServersTotalSpillovers:                     prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_spillovers", Help: "Total spillovers"}, vsLabels),
-		csVirtualServersDeferredRequests:                    prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_deferred_requests", Help: "Deferred requests"}, vsLabels),
-		csVirtualServersNumberInvalidRequestResponse:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_number_invalid_request_response", Help: "Invalid request/responses"}, vsLabels),
-		csVirtualServersNumberInvalidRequestResponseDropped: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_number_invalid_request_response_dropped", Help: "Invalid request/responses dropped"}, vsLabels),
-		csVirtualServersTotalVServerDownBackupHits:          prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_total_vserver_down_backup_hits", Help: "Backup hits when vserver down"}, vsLabels),
+		csVirtualServersTotalPacketsReceived:                newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_packets_received_total", Help: "Total packets received"}, vsLabels),
+		csVirtualServersTotalPacketsSent:                    newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_packets_sent_total", Help: "Total packets sent"}, vsLabels),
+		csVirtualServersTotalSpillovers:                     newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_spillovers_total", Help: "Total spillovers"}, vsLabels),
+		csVirtualServersDeferredRequests:                    newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_deferred_requests_total", Help: "Deferred requests"}, vsLabels),
+		csVirtualServersNumberInvalidRequestResponse:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_number_invalid_request_response_total", Help: "Invalid request/responses"}, vsLabels),
+		csVirtualServersNumberInvalidRequestResponseDropped: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_number_invalid_request_response_dropped_total", Help: "Invalid request/responses dropped"}, vsLabels),
+		csVirtualServersTotalVServerDownBackupHits:          newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_vserver_down_backup_hits_total", Help: "Backup hits when vserver down"}, vsLabels),
 		csVirtualServersCurrentMultipathSessions:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_current_multipath_sessions", Help: "Current multipath TCP sessions"}, vsLabels),
 		csVirtualServersCurrentMultipathSubflows:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "cs_virtual_servers_current_multipath_subflows", Help: "Current multipath TCP subflows"}, vsLabels),
 
 		// VPN Virtual Server metrics
-		vpnVirtualServersTotalRequests:      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_total_requests", Help: "Total requests"}, vpnVsLabels),
-		vpnVirtualServersTotalResponses:     prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_total_responses", Help: "Total responses"}, vpnVsLabels),
-		vpnVirtualServersTotalRequestBytes:  prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_total_request_bytes", Help: "Total request bytes"}, vpnVsLabels),
-		vpnVirtualServersTotalResponseBytes: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_total_response_bytes", Help: "Total response bytes"}, vpnVsLabels),
+		vpnVirtualServersTotalRequests:      newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_requests_total", Help: "Total requests"}, vpnVsLabels),
+		vpnVirtualServersTotalResponses:     newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_responses_total", Help: "Total responses"}, vpnVsLabels),
+		vpnVirtualServersTotalRequestBytes:  newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_request_bytes_total", Help: "Total request bytes"}, vpnVsLabels),
+		vpnVirtualServersTotalResponseBytes: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_response_bytes_total", Help: "Total response bytes"}, vpnVsLabels),
 		vpnVirtualServersState:              prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "vpn_virtual_servers_state", Help: "Current state"}, vpnVsLabels),
 
 		// AAA metrics
-		aaaAuthSuccess:         prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "aaa_auth_success", Help: "Authentication successes"}, baseLabels),
-		aaaAuthFail:            prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "aaa_auth_fail", Help: "Authentication failures"}, baseLabels),
-		aaaAuthOnlyHTTPSuccess: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "aaa_auth_only_http_success", Help: "HTTP auth successes"}, baseLabels),
-		aaaAuthOnlyHTTPFail:    prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "aaa_auth_only_http_fail", Help: "HTTP auth failures"}, baseLabels),
+		aaaAuthSuccess:         newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "aaa_auth_success_total", Help: "Authentication successes"}, baseLabels),
+		aaaAuthFail:            newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "aaa_auth_fail_total", Help: "Authentication failures"}, baseLabels),
+		aaaAuthOnlyHTTPSuccess: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "aaa_auth_only_http_success_total", Help: "HTTP auth successes"}, baseLabels),
+		aaaAuthOnlyHTTPFail:    newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "aaa_auth_only_http_fail_total", Help: "HTTP auth failures"}, baseLabels),
 		aaaCurIcaSessions:      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "aaa_current_ica_sessions", Help: "Current ICA sessions"}, baseLabels),
 		aaaCurIcaOnlyConn:      prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "aaa_current_ica_only_connections", Help: "Current ICA connections"}, baseLabels),
 
@@ -583,7 +583,7 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		// Topology node stats (for node graph visualization)
 		topologyNodeState:         prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_state", Help: "Node state (1=UP, 0=DOWN)"}, topoNodeStatsLabels),
 		topologyNodeHealth:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_health", Help: "Node health percentage (0-100)"}, topoNodeStatsLabels),
-		topologyNodeRequestsTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_requests_total", Help: "Total requests processed by node"}, topoNodeStatsLabels),
+		topologyNodeRequestsTotal: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "topology_node_requests_total", Help: "Total requests processed by node"}, topoNodeStatsLabels),
 		topologyNodeConnections:   prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_connections", Help: "Current client connections to node"}, topoNodeStatsLabels),
 		topologyNodeTTFBMs:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "topology_node_ttfb_ms", Help: "Average time to first byte in milliseconds"}, topoNodeStatsLabels),
 
@@ -663,10 +663,10 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		tcpClientConnOpenedRate:     prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_client_connections_opened_rate"), "TCP client connections opened rate", baseLabels, nil),
 		tcpErrBadChecksum:           prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_bad_checksum_total"), "TCP bad checksum errors", baseLabels, nil),
 		tcpErrBadChecksumRate:       prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_bad_checksum_rate"), "TCP bad checksum errors rate", baseLabels, nil),
-		tcpErrAnyPortFail:           prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_any_port_fail"), "TCP any port fail errors", baseLabels, nil),
-		tcpErrIPPortFail:            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_ip_port_fail"), "TCP IP port fail errors", baseLabels, nil),
-		tcpErrBadStateConn:          prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_bad_state_conn"), "TCP bad state connection errors", baseLabels, nil),
-		tcpErrRstThreshold:          prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_rst_threshold"), "TCP RST threshold errors", baseLabels, nil),
+		tcpErrAnyPortFail:           prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_any_port_fail_total"), "TCP any port fail errors", baseLabels, nil),
+		tcpErrIPPortFail:            prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_ip_port_fail_total"), "TCP IP port fail errors", baseLabels, nil),
+		tcpErrBadStateConn:          prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_bad_state_conn_total"), "TCP bad state connection errors", baseLabels, nil),
+		tcpErrRstThreshold:          prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_err_rst_threshold_total"), "TCP RST threshold errors", baseLabels, nil),
 		tcpSynRate:                  prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_syn_rate"), "TCP SYN rate", baseLabels, nil),
 		tcpSynProbeRate:             prometheus.NewDesc(prometheus.BuildFQName(metricsNamespace, "", "tcp_syn_probe_rate"), "TCP SYN probe rate", baseLabels, nil),
 
@@ -726,14 +726,14 @@ func NewExporter(cfg *config.Config, url, targetType, username, password string,
 		sslCertDaysToExpire: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "ssl_cert_days_to_expire", Help: "Days until SSL certificate expires"}, sslCertLabels),
 
 		// SSL VServer metrics
-		sslVServerTotalDecBytes:          prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_decrypt_bytes_total", Help: "Total bytes decrypted"}, sslVsLabels),
-		sslVServerTotalEncBytes:          prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_encrypt_bytes_total", Help: "Total bytes encrypted"}, sslVsLabels),
-		sslVServerTotalHWDecBytes:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_hw_decrypt_bytes_total", Help: "Total hardware decrypted bytes"}, sslVsLabels),
-		sslVServerTotalHWEncBytes:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_hw_encrypt_bytes_total", Help: "Total hardware encrypted bytes"}, sslVsLabels),
-		sslVServerTotalSessionNew:        prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_session_new_total", Help: "Total new sessions"}, sslVsLabels),
-		sslVServerTotalSessionHits:       prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_session_hits_total", Help: "Total session hits"}, sslVsLabels),
-		sslVServerTotalClientAuthSuccess: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_client_auth_success_total", Help: "Total client auth successes"}, sslVsLabels),
-		sslVServerTotalClientAuthFailure: prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_client_auth_failure_total", Help: "Total client auth failures"}, sslVsLabels),
+		sslVServerTotalDecBytes:          newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_decrypt_bytes_total", Help: "Total bytes decrypted"}, sslVsLabels),
+		sslVServerTotalEncBytes:          newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_encrypt_bytes_total", Help: "Total bytes encrypted"}, sslVsLabels),
+		sslVServerTotalHWDecBytes:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_hw_decrypt_bytes_total", Help: "Total hardware decrypted bytes"}, sslVsLabels),
+		sslVServerTotalHWEncBytes:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_hw_encrypt_bytes_total", Help: "Total hardware encrypted bytes"}, sslVsLabels),
+		sslVServerTotalSessionNew:        newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_session_new_total", Help: "Total new sessions"}, sslVsLabels),
+		sslVServerTotalSessionHits:       newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_session_hits_total", Help: "Total session hits"}, sslVsLabels),
+		sslVServerTotalClientAuthSuccess: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_client_auth_success_total", Help: "Total client auth successes"}, sslVsLabels),
+		sslVServerTotalClientAuthFailure: newAbsoluteCounterVec(prometheus.CounterOpts{Namespace: metricsNamespace, Name: "sslvserver_client_auth_failure_total", Help: "Total client auth failures"}, sslVsLabels),
 		sslVServerHealth:                 prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_health", Help: "SSL vserver health"}, sslVsLabels),
 		sslVServerActiveServices:         prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_active_services", Help: "Active services"}, sslVsLabels),
 		sslVServerClientAuthSuccessRate:  prometheus.NewGaugeVec(prometheus.GaugeOpts{Namespace: metricsNamespace, Name: "sslvserver_client_auth_success_rate", Help: "Client auth success rate"}, sslVsLabels),

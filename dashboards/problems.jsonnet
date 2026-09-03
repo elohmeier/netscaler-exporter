@@ -509,7 +509,7 @@ local certsRow =
 local zeroHitsTable =
   table.new('vServers with Zero Hits (potentially unused)')
   + table.queryOptions.withTargets([
-    promQuery('max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_total_hits{deployment_environment_name=~"$environment",netscaler_cluster=~"$netscaler_cluster"} == 0) and on(virtual_server, netscaler_cluster) max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_state{deployment_environment_name=~"$environment",netscaler_cluster=~"$netscaler_cluster"} == 1)', '')
+    promQuery('max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_hits_total{deployment_environment_name=~"$environment",netscaler_cluster=~"$netscaler_cluster"} == 0) and on(virtual_server, netscaler_cluster) max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_state{deployment_environment_name=~"$environment",netscaler_cluster=~"$netscaler_cluster"} == 1)', '')
     + { format: 'table', instant: true },
   ])
   + table.queryOptions.withTransformations([

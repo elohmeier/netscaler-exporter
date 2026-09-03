@@ -21,15 +21,15 @@ func (e *Exporter) collectSSLStats(ctx context.Context, nsClient *netscaler.Nitr
 	ssl := stats.SSLStats
 
 	// Counters
-	e.sendMetric(ch, e.sslTotalTLSv11Sessions, ssl.TotalTLSv11Sessions, baseLabels)
-	e.sendMetric(ch, e.sslTotalSSLv2Sessions, ssl.TotalSSLv2Sessions, baseLabels)
-	e.sendMetric(ch, e.sslTotalSessions, ssl.TotalSessions, baseLabels)
-	e.sendMetric(ch, e.sslTotalSSLv2Handshakes, ssl.TotalSSLv2Handshakes, baseLabels)
-	e.sendMetric(ch, e.sslTotalEnc, ssl.TotalEnc, baseLabels)
-	e.sendMetric(ch, e.sslCryptoUtilization, ssl.CryptoUtilizationStat, baseLabels)
-	e.sendMetric(ch, e.sslTotalNewSessions, ssl.TotalNewSessions, baseLabels)
+	e.sendCounterMetric(ch, e.sslTotalTLSv11Sessions, ssl.TotalTLSv11Sessions, baseLabels)
+	e.sendCounterMetric(ch, e.sslTotalSSLv2Sessions, ssl.TotalSSLv2Sessions, baseLabels)
+	e.sendCounterMetric(ch, e.sslTotalSessions, ssl.TotalSessions, baseLabels)
+	e.sendCounterMetric(ch, e.sslTotalSSLv2Handshakes, ssl.TotalSSLv2Handshakes, baseLabels)
+	e.sendCounterMetric(ch, e.sslTotalEnc, ssl.TotalEnc, baseLabels)
+	e.sendCounterMetric(ch, e.sslTotalNewSessions, ssl.TotalNewSessions, baseLabels)
 
 	// Gauges
+	e.sendMetric(ch, e.sslCryptoUtilization, ssl.CryptoUtilizationStat, baseLabels)
 	e.sendMetric(ch, e.sslSessionsRate, ssl.SessionsRate, baseLabels)
 	e.sendMetric(ch, e.sslDecRate, ssl.DecRate, baseLabels)
 	e.sendMetric(ch, e.sslEncRate, ssl.EncRate, baseLabels)
@@ -64,7 +64,7 @@ func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscal
 		return false
 	}
 
-	// Reset all gauges
+	// Reset all SSL vserver metrics
 	e.sslVServerTotalDecBytes.Reset()
 	e.sslVServerTotalEncBytes.Reset()
 	e.sslVServerTotalHWDecBytes.Reset()
@@ -87,14 +87,14 @@ func (e *Exporter) collectSSLVServerStats(ctx context.Context, nsClient *netscal
 	for _, vs := range stats.SSLVServerStats {
 		labels := e.buildLabelValues(vs.VServerName, vs.Type, vs.PrimaryIPAddress)
 
-		setGaugeVal(e.sslVServerTotalDecBytes, labels, vs.TotalDecBytes)
-		setGaugeVal(e.sslVServerTotalEncBytes, labels, vs.TotalEncBytes)
-		setGaugeVal(e.sslVServerTotalHWDecBytes, labels, vs.TotalHWDecBytes)
-		setGaugeVal(e.sslVServerTotalHWEncBytes, labels, vs.TotalHWEncBytes)
-		setGaugeVal(e.sslVServerTotalSessionNew, labels, vs.TotalSessionNew)
-		setGaugeVal(e.sslVServerTotalSessionHits, labels, vs.TotalSessionHits)
-		setGaugeVal(e.sslVServerTotalClientAuthSuccess, labels, vs.TotalClientAuthSuccess)
-		setGaugeVal(e.sslVServerTotalClientAuthFailure, labels, vs.TotalClientAuthFailure)
+		setCounterVal(e.sslVServerTotalDecBytes, labels, vs.TotalDecBytes)
+		setCounterVal(e.sslVServerTotalEncBytes, labels, vs.TotalEncBytes)
+		setCounterVal(e.sslVServerTotalHWDecBytes, labels, vs.TotalHWDecBytes)
+		setCounterVal(e.sslVServerTotalHWEncBytes, labels, vs.TotalHWEncBytes)
+		setCounterVal(e.sslVServerTotalSessionNew, labels, vs.TotalSessionNew)
+		setCounterVal(e.sslVServerTotalSessionHits, labels, vs.TotalSessionHits)
+		setCounterVal(e.sslVServerTotalClientAuthSuccess, labels, vs.TotalClientAuthSuccess)
+		setCounterVal(e.sslVServerTotalClientAuthFailure, labels, vs.TotalClientAuthFailure)
 		setGaugeVal(e.sslVServerHealth, labels, vs.Health)
 		setGaugeVal(e.sslVServerActiveServices, labels, vs.ActiveServices)
 		setGaugeVal(e.sslVServerClientAuthSuccessRate, labels, vs.ClientAuthSuccessRate)
@@ -169,4 +169,10 @@ func (e *Exporter) collectNSCapacityStats(ctx context.Context, nsClient *netscal
 func setGaugeVal(g *prometheus.GaugeVec, labels []string, value any) {
 	val, _ := strconv.ParseFloat(fmt.Sprint(value), 64)
 	g.WithLabelValues(labels...).Set(val)
+}
+
+// setCounterVal sets an absolute cumulative value reported by the NetScaler.
+func setCounterVal(c *absoluteCounterVec, labels []string, value any) {
+	val, _ := strconv.ParseFloat(fmt.Sprint(value), 64)
+	c.WithLabelValues(labels...).Set(val)
 }

@@ -286,23 +286,23 @@ local systemRow =
 local interfaceTraffic =
   timeSeries.new('Interface Traffic')
   + timeSeries.queryOptions.withTargets([
-    promQuery('rate(netscaler_interfaces_received_bytes{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} RX'),
-    promQuery('rate(netscaler_interfaces_transmitted_bytes{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} TX'),
+    promQuery('rate(netscaler_interfaces_received_bytes_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} RX'),
+    promQuery('rate(netscaler_interfaces_transmitted_bytes_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} TX'),
   ])
   + timeSeries.standardOptions.withUnit('Bps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
 
 local interfaceErrors =
   timeSeries.new('Interface Errors')
-  + timeSeries.queryOptions.withTargets([promQuery('rate(netscaler_interfaces_error_packets_received{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('rate(netscaler_interfaces_error_packets_received_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}}')])
   + timeSeries.standardOptions.withUnit('pps')
   + timeSeries.gridPos.withW(6) + timeSeries.gridPos.withH(6);
 
 local interfaceJumbo =
   timeSeries.new('Jumbo Packets')
   + timeSeries.queryOptions.withTargets([
-    promQuery('rate(netscaler_interfaces_jumbo_packets_received{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} RX'),
-    promQuery('rate(netscaler_interfaces_jumbo_packets_transmitted{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} TX'),
+    promQuery('rate(netscaler_interfaces_jumbo_packets_received_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} RX'),
+    promQuery('rate(netscaler_interfaces_jumbo_packets_transmitted_total{host_name=~"$host_name"}[$__rate_interval])', '{{host_name}} {{interface}} TX'),
   ])
   + timeSeries.standardOptions.withUnit('pps')
   + timeSeries.gridPos.withW(6) + timeSeries.gridPos.withH(6);
@@ -380,7 +380,7 @@ local ipErrors =
 
 local tcpErrors =
   timeSeries.new('TCP Errors')
-  + timeSeries.queryOptions.withTargets([promQuery('netscaler_tcp_err_ip_port_fail{host_name=~"$host_name"}', '{{host_name}} IP Port Fail')])
+  + timeSeries.queryOptions.withTargets([promQuery('netscaler_tcp_err_ip_port_fail_total{host_name=~"$host_name"}', '{{host_name}} IP Port Fail')])
   + timeSeries.standardOptions.withUnit('short')
   + timeSeries.gridPos.withW(8) + timeSeries.gridPos.withH(6);
 
@@ -397,7 +397,7 @@ local csStatesTable =
   + table.queryOptions.withTargets([
     promQuery('netscaler_cs_virtual_servers_state{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'A' },
-    promQuery('netscaler_cs_virtual_servers_total_hits{host_name=~"$host_name"}', '')
+    promQuery('netscaler_cs_virtual_servers_hits_total{host_name=~"$host_name"}', '')
     + { format: 'table', instant: true, refId: 'B' },
   ])
   + table.queryOptions.withTransformations([
@@ -463,7 +463,7 @@ local csStatesTable =
 local csTopHits =
   barGauge.new('Top CS vServers by Hits')
   + barGauge.queryOptions.withTargets([
-    promQuery('topk(10, netscaler_cs_virtual_servers_total_hits{host_name=~"$host_name"})', '{{virtual_server}}')
+    promQuery('topk(10, netscaler_cs_virtual_servers_hits_total{host_name=~"$host_name"})', '{{virtual_server}}')
     + { instant: true },
   ])
   + barGauge.queryOptions.withTransformations([

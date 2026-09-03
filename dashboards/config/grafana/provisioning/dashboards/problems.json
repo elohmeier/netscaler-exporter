@@ -1038,7 +1038,7 @@
                         "type": "prometheus",
                         "uid": "$datasource"
                      },
-                     "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_total_hits{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0) and on(virtual_server, netscaler_cluster) max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 1)",
+                     "expr": "max by (virtual_server, netscaler_cluster, deployment_environment_name) (netscaler_virtual_servers_hits_total{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 0) and on(virtual_server, netscaler_cluster) max by (virtual_server, netscaler_cluster) (netscaler_virtual_servers_state{deployment_environment_name=~\"$environment\",netscaler_cluster=~\"$netscaler_cluster\"} == 1)",
                      "format": "table",
                      "instant": true,
                      "interval": "1m",

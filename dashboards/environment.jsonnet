@@ -217,7 +217,7 @@ local clusterHealthRow =
 local requestsByCluster =
   timeSeries.new('Requests by Cluster')
   + timeSeries.queryOptions.withTargets([
-    promQuery('sum by (netscaler_cluster) (rate(netscaler_cs_virtual_servers_total_requests{deployment_environment_name=~"$environment"}[$__rate_interval])) + sum by (netscaler_cluster) (rate(netscaler_virtual_servers_total_requests{deployment_environment_name=~"$environment"}[$__rate_interval]))', '{{netscaler_cluster}}'),
+    promQuery('sum by (netscaler_cluster) (rate(netscaler_cs_virtual_servers_requests_total{deployment_environment_name=~"$environment"}[$__rate_interval])) + sum by (netscaler_cluster) (rate(netscaler_virtual_servers_requests_total{deployment_environment_name=~"$environment"}[$__rate_interval]))', '{{netscaler_cluster}}'),
   ])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.gridPos.withW(8) + timeSeries.gridPos.withH(8);
@@ -241,8 +241,8 @@ local connectionsByCluster =
 local topServices =
   timeSeries.new('Top Services')
   + timeSeries.queryOptions.withTargets([
-    promQuery('topk(5, sum by (virtual_server) (rate(netscaler_cs_virtual_servers_total_requests{deployment_environment_name=~"$environment"}[$__rate_interval])))', '{{virtual_server}}'),
-    promQuery('topk(5, sum by (virtual_server) (rate(netscaler_virtual_servers_total_requests{deployment_environment_name=~"$environment"}[$__rate_interval])))', '{{virtual_server}}'),
+    promQuery('topk(5, sum by (virtual_server) (rate(netscaler_cs_virtual_servers_requests_total{deployment_environment_name=~"$environment"}[$__rate_interval])))', '{{virtual_server}}'),
+    promQuery('topk(5, sum by (virtual_server) (rate(netscaler_virtual_servers_requests_total{deployment_environment_name=~"$environment"}[$__rate_interval])))', '{{virtual_server}}'),
   ])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.standardOptions.withLinks([

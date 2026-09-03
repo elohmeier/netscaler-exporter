@@ -134,8 +134,8 @@ local chainRootState =
 local chainHits =
   stat.new('Total Hits')
   + stat.queryOptions.withTargets([
-    promQuery('netscaler_cs_virtual_servers_total_hits{virtual_server=~"$chain"}', 'CS'),
-    promQuery('netscaler_virtual_servers_total_hits{virtual_server=~"$chain"}', 'LB'),
+    promQuery('netscaler_cs_virtual_servers_hits_total{virtual_server=~"$chain"}', 'CS'),
+    promQuery('netscaler_virtual_servers_hits_total{virtual_server=~"$chain"}', 'LB'),
   ])
   + stat.standardOptions.withUnit('short')
   + stat.options.withColorMode('none')
@@ -314,15 +314,15 @@ local lbActiveInactive =
 
 local lbRequests =
   timeSeries.new('LB Requests')
-  + timeSeries.queryOptions.withTargets([promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_total_requests{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_requests_total{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}}')])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
 
 local lbTraffic =
   timeSeries.new('LB Traffic')
   + timeSeries.queryOptions.withTargets([
-    promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_total_request_bytes{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}} RX'),
-    promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_total_response_bytes{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}} TX'),
+    promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_request_bytes_total{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}} RX'),
+    promQuery('max by (virtual_server) (rate(netscaler_virtual_servers_response_bytes_total{virtual_server=~"$lbvserver"}[$__rate_interval]))', '{{virtual_server}} TX'),
   ])
   + timeSeries.standardOptions.withUnit('Bps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
@@ -391,7 +391,7 @@ local sgTtfb =
 
 local sgRequests =
   timeSeries.new('Member Requests')
-  + timeSeries.queryOptions.withTargets([promQuery('max by (servicegroup, member, port) (rate(netscaler_servicegroup_total_requests{servicegroup=~"$servicegroup"}[$__rate_interval]))', '{{member}}:{{port}}')])
+  + timeSeries.queryOptions.withTargets([promQuery('max by (servicegroup, member, port) (rate(netscaler_servicegroup_requests_total{servicegroup=~"$servicegroup"}[$__rate_interval]))', '{{member}}:{{port}}')])
   + timeSeries.standardOptions.withUnit('reqps')
   + timeSeries.gridPos.withW(12) + timeSeries.gridPos.withH(6);
 
